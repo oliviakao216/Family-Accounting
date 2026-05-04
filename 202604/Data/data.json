@@ -1,0 +1,1383 @@
+{
+  "bankRecords": [
+    {
+      "id": "b1",
+      "bank": "中信",
+      "date": "2026-03-24",
+      "details": "統一超商",
+      "amountTWD": 79,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "私用"
+    },
+    {
+      "id": "b2",
+      "bank": "中信",
+      "date": "2026-03-24",
+      "details": "臺北市立聯合醫院-和平",
+      "amountTWD": 300,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "醫療",
+      "usageType": "私用"
+    },
+    {
+      "id": "b3",
+      "bank": "中信",
+      "date": "2026-03-24",
+      "details": "JCB_CB_ITUNES_TWN",
+      "amountTWD": -100,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "未分類",
+      "usageType": "私用"
+    },
+    {
+      "id": "b4",
+      "bank": "中信",
+      "date": "2026-03-27",
+      "details": "家樂福量販桂林店-自助",
+      "amountTWD": 156,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "家用",
+      "usageType": "私用"
+    },
+    {
+      "id": "b5",
+      "bank": "中信",
+      "date": "2026-03-30",
+      "details": "中油-龍安自助加油站 A",
+      "amountTWD": 153,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "交通",
+      "usageType": "私用"
+    },
+    {
+      "id": "b6",
+      "bank": "中信",
+      "date": "2026-03-31",
+      "details": "臺北市立聯合醫院-和平",
+      "amountTWD": 300,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "醫療",
+      "usageType": "私用"
+    },
+    {
+      "id": "b7",
+      "bank": "中信",
+      "date": "2026-04-04",
+      "details": "OPEN錢包統一超商",
+      "amountTWD": 15,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "私用"
+    },
+    {
+      "id": "b8",
+      "bank": "中信",
+      "date": "2026-04-04",
+      "details": "GOOGLE PAYMENT CORP",
+      "amountTWD": 479,
+      "amountForeign": "15.00",
+      "currency": "USD",
+      "category": "工具",
+      "usageType": "私用"
+    },
+    {
+      "id": "b9",
+      "bank": "中信",
+      "date": "2026-04-04",
+      "details": "國外交易手續費",
+      "amountTWD": 7,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "工具",
+      "usageType": "私用"
+    },
+    {
+      "id": "b10",
+      "bank": "中信",
+      "date": "2026-04-05",
+      "details": "momo*福穀樂幸福安",
+      "amountTWD": 464,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "私用"
+    },
+    {
+      "id": "b11",
+      "bank": "中信",
+      "date": "2026-04-05",
+      "details": "momo*福穀樂幸福安",
+      "amountTWD": 292,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "私用"
+    },
+    {
+      "id": "b12",
+      "bank": "中信",
+      "date": "2026-04-07",
+      "details": "寶雅生活館台北古亭店",
+      "amountTWD": 713,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "家用",
+      "usageType": "私用"
+    },
+    {
+      "id": "b13",
+      "bank": "中信",
+      "date": "2026-04-10",
+      "details": "富邦momo-EC",
+      "amountTWD": 799,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "未分類",
+      "usageType": "私用"
+    },
+    {
+      "id": "b14",
+      "bank": "中信",
+      "date": "2026-04-10",
+      "details": "樂購蝦皮-905b_7",
+      "amountTWD": 958,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "未分類",
+      "usageType": "私用"
+    },
+    {
+      "id": "b15",
+      "bank": "中信",
+      "date": "2026-04-14",
+      "details": "JCB_CB_GOOGLEPLAY2_TWN",
+      "amountTWD": -130,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "工具",
+      "usageType": "私用"
+    },
+    {
+      "id": "b16",
+      "bank": "中信",
+      "date": "2026-04-16",
+      "details": "OPEN錢包統一超商",
+      "amountTWD": 45,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "私用"
+    },
+    {
+      "id": "b17",
+      "bank": "中信",
+      "date": "2026-04-16",
+      "details": "OPENAI",
+      "amountTWD": 165,
+      "amountForeign": "5.25",
+      "currency": "USD",
+      "category": "工具",
+      "usageType": "私用"
+    },
+    {
+      "id": "b18",
+      "bank": "中信",
+      "date": "2026-04-16",
+      "details": "國外交易手續費",
+      "amountTWD": 2,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "工具",
+      "usageType": "私用"
+    },
+    {
+      "id": "y1",
+      "bank": "永豐",
+      "date": "2026-03-29",
+      "details": "連加*奇福扁食(寧波店",
+      "amountTWD": 165,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "y4",
+      "bank": "永豐",
+      "date": "2026-04-01",
+      "details": "連支*微風南京",
+      "amountTWD": 65,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "私用"
+    },
+    {
+      "id": "u1",
+      "bank": "聯邦",
+      "date": "2026-03-24",
+      "details": "樂購蝦皮-s9605280",
+      "amountTWD": 709,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "分離大豆蛋白"
+    },
+    {
+      "id": "u2",
+      "bank": "聯邦",
+      "date": "2026-03-24",
+      "details": "樂購蝦皮-elleaircyh",
+      "amountTWD": 3198,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "日本大王尿布"
+    },
+    {
+      "id": "u3",
+      "bank": "聯邦",
+      "date": "2026-03-25",
+      "details": "杏一醫療用品AB154和平院",
+      "amountTWD": 351,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "醫療",
+      "usageType": "家用"
+    },
+    {
+      "id": "u4",
+      "bank": "聯邦",
+      "date": "2026-03-25",
+      "details": "優步福爾摩沙股份有限公司",
+      "amountTWD": 414,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u5",
+      "bank": "聯邦",
+      "date": "2026-03-29",
+      "details": "樂購蝦皮-s9ub7ok9ok",
+      "amountTWD": 1021,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "棉棒、針筒"
+    },
+    {
+      "id": "u6",
+      "bank": "聯邦",
+      "date": "2026-03-31",
+      "details": "優食-好味道排骨大王 永和店",
+      "amountTWD": 368,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u7",
+      "bank": "聯邦",
+      "date": "2026-03-31",
+      "details": "優食-周游列國手?皮水餃",
+      "amountTWD": 267,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u8",
+      "bank": "聯邦",
+      "date": "2026-03-31",
+      "details": "FP-艾搗蛋手工蛋餅專賣店",
+      "amountTWD": 294,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u9",
+      "bank": "聯邦",
+      "date": "2026-03-31",
+      "details": "代收-新東王麵包坊-南昌店",
+      "amountTWD": 358,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u10",
+      "bank": "聯邦",
+      "date": "2026-03-31",
+      "details": "樂購蝦皮-s1u8u47h5",
+      "amountTWD": 199,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "貼布"
+    },
+    {
+      "id": "u11",
+      "bank": "聯邦",
+      "date": "2026-04-01",
+      "details": "家樂福量販桂林店-自助",
+      "amountTWD": 1732,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "家用",
+      "usageType": "家用"
+    },
+    {
+      "id": "u12",
+      "bank": "聯邦",
+      "date": "2026-04-01",
+      "details": "大樹連鎖藥局-中正汀州門市",
+      "amountTWD": 69,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "醫療",
+      "usageType": "家用"
+    },
+    {
+      "id": "u13",
+      "bank": "聯邦",
+      "date": "2026-04-01",
+      "details": "大樹連鎖藥局-中正汀州門市",
+      "amountTWD": 90,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "醫療",
+      "usageType": "家用"
+    },
+    {
+      "id": "u14",
+      "bank": "聯邦",
+      "date": "2026-04-01",
+      "details": "優食-尚青 炒飯炒麵專門",
+      "amountTWD": 248,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u15",
+      "bank": "聯邦",
+      "date": "2026-04-02",
+      "details": "代收-統一超商-正元",
+      "amountTWD": 68,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u17",
+      "bank": "聯邦",
+      "date": "2026-04-02",
+      "details": "連支*梁社漢排骨中正廣",
+      "amountTWD": 256,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u18",
+      "bank": "聯邦",
+      "date": "2026-04-04",
+      "details": "美廉社-中正汀州店",
+      "amountTWD": 162,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u19",
+      "bank": "聯邦",
+      "date": "2026-04-07",
+      "details": "優食-癮？海鮮食堂-",
+      "amountTWD": 255,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u20",
+      "bank": "聯邦",
+      "date": "2026-04-07",
+      "details": "優步福爾摩沙股份有限公司-Dicos德克",
+      "amountTWD": 336,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u21",
+      "bank": "聯邦",
+      "date": "2026-04-07",
+      "details": "FP-師大雞肉飯專門店",
+      "amountTWD": 258,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u22",
+      "bank": "聯邦",
+      "date": "2026-04-07",
+      "details": "樂購蝦皮-app29079069",
+      "amountTWD": 829,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "家用",
+      "usageType": "家用",
+      "customSummary": "衝生紙"
+    },
+    {
+      "id": "u23",
+      "bank": "聯邦",
+      "date": "2026-04-07",
+      "details": "優步福爾摩沙股份有限公司-無一物 海產粥",
+      "amountTWD": 362,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u24",
+      "bank": "聯邦",
+      "date": "2026-04-07",
+      "details": "代收-統一超商-正元",
+      "amountTWD": 60,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u25",
+      "bank": "聯邦",
+      "date": "2026-04-08",
+      "details": "FP-21PLUS、21風味館",
+      "amountTWD": 277,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u26",
+      "bank": "聯邦",
+      "date": "2026-04-08",
+      "details": "優步福爾摩沙股份有限公司-巷弄炒？？肉",
+      "amountTWD": 546,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u27",
+      "bank": "聯邦",
+      "date": "2026-04-09",
+      "details": "家樂福量販桂林店-自助",
+      "amountTWD": 1528,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "家用",
+      "usageType": "家用"
+    },
+    {
+      "id": "u28",
+      "bank": "聯邦",
+      "date": "2026-04-09",
+      "details": "FP-勞碌命鍋燒意麵",
+      "amountTWD": 249,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u29",
+      "bank": "聯邦",
+      "date": "2026-04-10",
+      "details": "連支*PCHOME 1",
+      "amountTWD": 2844,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "益能勝益生菌"
+    },
+    {
+      "id": "u30",
+      "bank": "聯邦",
+      "date": "2026-04-10",
+      "details": "foodpanda-EC (CtV)",
+      "amountTWD": 263,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u31",
+      "bank": "聯邦",
+      "date": "2026-04-11",
+      "details": "連加*Coupang",
+      "amountTWD": 834,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "雞精"
+    },
+    {
+      "id": "u32",
+      "bank": "聯邦",
+      "date": "2026-04-13",
+      "details": "foodpanda-EC (CtV)",
+      "amountTWD": 316,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u33",
+      "bank": "聯邦",
+      "date": "2026-04-13",
+      "details": "家樂福超市萬華中華店",
+      "amountTWD": 464,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "家用",
+      "usageType": "家用"
+    },
+    {
+      "id": "u34",
+      "bank": "聯邦",
+      "date": "2026-04-13",
+      "details": "連加*新東王烘焙坊",
+      "amountTWD": 189,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u35",
+      "bank": "聯邦",
+      "date": "2026-04-13",
+      "details": "連加*MUGU牧谷",
+      "amountTWD": 225,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u36",
+      "bank": "聯邦",
+      "date": "2026-04-13",
+      "details": "樂購蝦皮-pjqlxyq0us",
+      "amountTWD": 6500,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "補體康"
+    },
+    {
+      "id": "u37",
+      "bank": "聯邦",
+      "date": "2026-04-14",
+      "details": "FP-金菊雞肉飯",
+      "amountTWD": 241,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u38",
+      "bank": "聯邦",
+      "date": "2026-04-14",
+      "details": "FP-大三？熱炒店",
+      "amountTWD": 548,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u39",
+      "bank": "聯邦",
+      "date": "2026-04-14",
+      "details": "美廉社-中正汀洲店",
+      "amountTWD": 80,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "家用",
+      "usageType": "家用"
+    },
+    {
+      "id": "u40",
+      "bank": "聯邦",
+      "date": "2026-04-15",
+      "details": "酷澎-然汀國際有限公司",
+      "amountTWD": 752,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "未分類",
+      "usageType": "私用"
+    },
+    {
+      "id": "u41",
+      "bank": "聯邦",
+      "date": "2026-04-15",
+      "details": "foodpanda-EC (CtV)",
+      "amountTWD": 201,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u42",
+      "bank": "聯邦",
+      "date": "2026-04-15",
+      "details": "FP-定食8",
+      "amountTWD": 329,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u43",
+      "bank": "聯邦",
+      "date": "2026-04-15",
+      "details": "連支*一沐日_台北延平",
+      "amountTWD": 180,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u44",
+      "bank": "聯邦",
+      "date": "2026-04-16",
+      "details": "連加*南機場夜市_康師",
+      "amountTWD": 330,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u45",
+      "bank": "聯邦",
+      "date": "2026-04-17",
+      "details": "foodpanda-EC (CtV)",
+      "amountTWD": 232,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u46",
+      "bank": "聯邦",
+      "date": "2026-04-17",
+      "details": "foodpanda-EC (CtV)",
+      "amountTWD": 509,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u47",
+      "bank": "聯邦",
+      "date": "2026-04-19",
+      "details": "樂購蝦皮-b95403024",
+      "amountTWD": 75,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "嬰兒擦拭布"
+    },
+    {
+      "id": "u48",
+      "bank": "聯邦",
+      "date": "2026-04-20",
+      "details": "樂購蝦皮-elleairc",
+      "amountTWD": 1799,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "日本大王尿布"
+    },
+    {
+      "id": "u49",
+      "bank": "聯邦",
+      "date": "2026-04-20",
+      "details": "FP-大福利排骨大王",
+      "amountTWD": 414,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u50",
+      "bank": "聯邦",
+      "date": "2026-04-20",
+      "details": "FP-安好食",
+      "amountTWD": 459,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u51",
+      "bank": "聯邦",
+      "date": "2026-04-21",
+      "details": "樂購蝦皮-hl_med539",
+      "amountTWD": 480,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "濕紙巾"
+    },
+    {
+      "id": "u52",
+      "bank": "聯邦",
+      "date": "2026-04-21",
+      "details": "foodpanda-EC (CtV)",
+      "amountTWD": 325,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u53",
+      "bank": "聯邦",
+      "date": "2026-04-21",
+      "details": "FP-艾搗蛋手工蛋餅專賣店",
+      "amountTWD": 397,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u54",
+      "bank": "聯邦",
+      "date": "2026-04-21",
+      "details": "FP-忠義號便當店",
+      "amountTWD": 294,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u55",
+      "bank": "聯邦",
+      "date": "2026-04-22",
+      "details": "樂購蝦皮-Shopee品牌特賣",
+      "amountTWD": 545,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用",
+      "customSummary": "屁屁膏"
+    },
+    {
+      "id": "u56",
+      "bank": "聯邦",
+      "date": "2026-04-22",
+      "details": "FP-饗嗑早午餐",
+      "amountTWD": 309,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u57",
+      "bank": "聯邦",
+      "date": "2026-04-22",
+      "details": "優步-尚青 炒飯炒麵專門",
+      "amountTWD": 507,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u58",
+      "bank": "聯邦",
+      "date": "2026-04-22",
+      "details": "LOUISA COFFEE",
+      "amountTWD": 170,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u59",
+      "bank": "聯邦",
+      "date": "2026-04-22",
+      "details": "LOUISA COFFEE",
+      "amountTWD": 270,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "u60",
+      "bank": "聯邦",
+      "date": "2026-04-22",
+      "details": "美廉社-中正汀洲店",
+      "amountTWD": 154,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "家用",
+      "usageType": "家用"
+    },
+    {
+      "id": "h1",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "午餐",
+      "amountTWD": 250,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h2",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "鼻胃管",
+      "amountTWD": 1500,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用"
+    },
+    {
+      "id": "h3",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "抗生素",
+      "amountTWD": 35,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用"
+    },
+    {
+      "id": "h4",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "晚餐",
+      "amountTWD": 190,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h5",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "三月報支少給",
+      "amountTWD": -208,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "缺/溢付款調整",
+      "usageType": "家用"
+    },
+    {
+      "id": "h6",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "菜蛋",
+      "amountTWD": 394,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h7",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "晚餐",
+      "amountTWD": 295,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h8",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "藥",
+      "amountTWD": 276,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用"
+    },
+    {
+      "id": "h9",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "湯底",
+      "amountTWD": 500,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h10",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "一週藥",
+      "amountTWD": 452,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用"
+    },
+    {
+      "id": "h11",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "午餐",
+      "amountTWD": 280,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h12",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "午餐",
+      "amountTWD": 210,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h13",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "午餐",
+      "amountTWD": 185,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h14",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "薪水溢",
+      "amountTWD": 210,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "缺/溢付款調整",
+      "usageType": "家用",
+      "customSummary": "薪水零頭瑗出"
+    },
+    {
+      "id": "h15",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "薪水多",
+      "amountTWD": -300,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "缺/溢付款調整",
+      "usageType": "家用",
+      "customSummary": "薪水多給"
+    },
+    {
+      "id": "h16",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "鼻胃管溢",
+      "amountTWD": -500,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用"
+    },
+    {
+      "id": "h17",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "輪椅換手把",
+      "amountTWD": 640,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用"
+    },
+    {
+      "id": "h18",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "午餐",
+      "amountTWD": 200,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h19",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "午餐",
+      "amountTWD": 180,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h20",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "晚餐",
+      "amountTWD": 300,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h21",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "樂可樂舒",
+      "amountTWD": 200,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用"
+    },
+    {
+      "id": "h22",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "午餐",
+      "amountTWD": 220,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h23",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "飲料",
+      "amountTWD": 150,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    },
+    {
+      "id": "h24",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "洗屁股、生理食鹽水",
+      "amountTWD": 460,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "母親照顧",
+      "usageType": "家用"
+    },
+    {
+      "id": "h25",
+      "bank": "手帳",
+      "date": "2026-04-29",
+      "details": "清老鼠",
+      "amountTWD": -100,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "家用",
+      "usageType": "家用"
+    },
+    {
+      "id": "m_1777608577927",
+      "bank": "手帳",
+      "date": "2026-05-01",
+      "details": "餐食",
+      "amountTWD": 190,
+      "amountForeign": "",
+      "currency": "TWD",
+      "category": "食",
+      "usageType": "家用"
+    }
+  ],
+  "ecommerceOrders": [
+    {
+      "id": "e1",
+      "platform": "蝦皮",
+      "date": "2026-03-24",
+      "items": [
+        {
+          "name": "VeganGoal 蛋白粉 1KG",
+          "price": 709
+        }
+      ],
+      "total": 709
+    },
+    {
+      "id": "e2",
+      "platform": "蝦皮",
+      "date": "2026-03-24",
+      "items": [
+        {
+          "name": "日本大王 Attento 愛適多 黏型紙尿褲 M/L 箱購",
+          "price": 1599
+        },
+        {
+          "name": "日本大王 Attento 愛適多 黏型紙尿褲 M/L 箱購",
+          "price": 1599
+        }
+      ],
+      "total": 3198
+    },
+    {
+      "id": "e3",
+      "platform": "蝦皮",
+      "date": "2026-04-10",
+      "items": [
+        {
+          "name": "SanDisk 記憶卡",
+          "price": 958
+        }
+      ],
+      "total": 958
+    },
+    {
+      "id": "e4",
+      "platform": "蝦皮",
+      "date": "2026-04-10",
+      "items": [
+        {
+          "name": "測試相同金額衝突商品 (模擬衝突用)",
+          "price": 958
+        }
+      ],
+      "total": 958
+    },
+    {
+      "id": "e5",
+      "platform": "蝦皮",
+      "date": "2026-03-29",
+      "items": [
+        {
+          "name": "ENT棉棒 3吋/6吋 多包裝",
+          "price": 1021
+        }
+      ],
+      "total": 1021
+    },
+    {
+      "id": "e6",
+      "platform": "蝦皮",
+      "date": "2026-03-31",
+      "items": [
+        {
+          "name": "PU防水貼膜",
+          "price": 199
+        }
+      ],
+      "total": 199
+    },
+    {
+      "id": "e7",
+      "platform": "蝦皮",
+      "date": "2026-04-07",
+      "items": [
+        {
+          "name": "倍潔雅 衛生紙",
+          "price": 829
+        }
+      ],
+      "total": 829
+    },
+    {
+      "id": "e8",
+      "platform": "蝦皮",
+      "date": "2026-04-13",
+      "items": [
+        {
+          "name": "三多 補體康 240ml 4箱",
+          "price": 6500
+        }
+      ],
+      "total": 6500
+    },
+    {
+      "id": "e9",
+      "platform": "蝦皮",
+      "date": "2026-04-19",
+      "items": [
+        {
+          "name": "小獅王辛巴 紗布巾",
+          "price": 75
+        }
+      ],
+      "total": 75
+    },
+    {
+      "id": "e10",
+      "platform": "蝦皮",
+      "date": "2026-04-20",
+      "items": [
+        {
+          "name": "日本大王 Attento 愛適多 黏型紙尿褲 M/L 箱購",
+          "price": 1799
+        }
+      ],
+      "total": 1799
+    },
+    {
+      "id": "e11",
+      "platform": "蝦皮",
+      "date": "2026-04-21",
+      "items": [
+        {
+          "name": "康乃馨 純水濕紙巾 80抽 12包",
+          "price": 480
+        }
+      ],
+      "total": 480
+    },
+    {
+      "id": "e12",
+      "platform": "蝦皮",
+      "date": "2026-04-22",
+      "items": [
+        {
+          "name": "樹之惠本舖 足貼",
+          "price": 545
+        }
+      ],
+      "total": 545
+    },
+    {
+      "id": "e13",
+      "platform": "酷澎",
+      "date": "2026-04-11",
+      "items": [
+        {
+          "name": "instaGet 煥白光水肌 等商品",
+          "price": 834
+        }
+      ],
+      "total": 834
+    },
+    {
+      "id": "e14",
+      "platform": "酷澎",
+      "date": "2026-04-15",
+      "items": [
+        {
+          "name": "益富 元氣強 720g 等商品",
+          "price": 752
+        }
+      ],
+      "total": 752
+    },
+    {
+      "id": "e15",
+      "platform": "momo",
+      "date": "2026-04-05",
+      "items": [
+        {
+          "name": "福穀樂 綜合包子",
+          "price": 464
+        }
+      ],
+      "total": 464
+    },
+    {
+      "id": "e16",
+      "platform": "momo",
+      "date": "2026-04-05",
+      "items": [
+        {
+          "name": "福穀樂 饅頭",
+          "price": 292
+        }
+      ],
+      "total": 292
+    },
+    {
+      "id": "e17",
+      "platform": "momo",
+      "date": "2026-04-10",
+      "items": [
+        {
+          "name": "momo 綜合日常用品",
+          "price": 799
+        }
+      ],
+      "total": 799
+    }
+  ]
+}
