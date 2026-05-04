@@ -23,18 +23,23 @@
                     </select>
                 </div>
             </div>
-            <div class="desktop-only-btns" style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
-                <button id="import-btn" class="secondary-btn" style="background-color: #ecc94b; color: #744210;">
-                    <span class="icon">📂</span> 匯入資料檔 (JSON)
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; align-items: center;">
+                <button id="help-btn" class="secondary-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; background: #e2e8f0; color: #4a5568; border: none; cursor: pointer;" title="操作教學">
+                    <span style="font-size: 1.2rem;">ⓘ</span>
                 </button>
-                <input type="file" id="file-upload" accept=".json" style="display: none;">
-                
-                <button id="print-btn" class="primary-btn" style="background-color: #4a5568; border-color: #2d3748;">
-                    <span class="icon">🖨️</span> 匯出 PDF
-                </button>
-                <button id="run-match-btn" class="primary-btn">
-                    <span class="icon">🔍</span> 執行自動比對
-                </button>
+                <div class="desktop-only-btns" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button id="import-btn" class="secondary-btn" style="background-color: #ecc94b; color: #744210;">
+                        <span class="icon">📂</span> 匯入資料檔 (JSON)
+                    </button>
+                    <input type="file" id="file-upload" accept=".json" style="display: none;">
+                    
+                    <button id="print-btn" class="primary-btn" style="background-color: #4a5568; border-color: #2d3748;">
+                        <span class="icon">🖨️</span> 匯出 PDF
+                    </button>
+                    <button id="run-match-btn" class="primary-btn">
+                        <span class="icon">🔍</span> 執行自動比對
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -161,6 +166,42 @@
             <div style="display: flex; gap: 1rem; justify-content: flex-end;">
                 <button id="cancel-manual-btn" class="primary-btn" style="background: #a0aec0;">取消</button>
                 <button id="confirm-manual-btn" class="primary-btn">儲存至雲端</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作教學視窗 -->
+    <div id="help-modal" class="modal">
+        <div class="modal-content" style="max-width: 600px; padding: 2rem;">
+            <div class="modal-header">
+                <h2>💡 家庭帳務系統 - 操作教學</h2>
+            </div>
+            <div class="modal-body" style="line-height: 1.6; font-size: 0.95rem;">
+                <h3 style="color: var(--primary-color); margin-bottom: 0.5rem; margin-top: 1rem;">📱 平時 (每天)</h3>
+                <p style="margin-bottom: 1.5rem;">手機的最佳用途是<strong>【隨手記帳】</strong>。人在外面買了便當、繳了費用，立刻拿出手機點擊橘色的「➕ 隨手記帳」，資料會瞬間存進雲端。</p>
+
+                <h3 style="color: var(--primary-color); margin-bottom: 0.5rem;">💻 月底大整理 (匯入帳單)</h3>
+                <p style="margin-bottom: 0.5rem;">電腦的最佳用途是<strong>【整批匯入】</strong>。每月大整理的標準作業流程如下：</p>
+                <ol style="padding-left: 1.5rem; margin-bottom: 1.5rem;">
+                    <li>拍下或截圖當月的銀行信用卡帳單（包含蝦皮/momo等明細）。</li>
+                    <li><strong>🤖 呼叫您的專屬秘書 Antigravity：</strong><br> 打開 AI 對話框，把截圖貼給 Antigravity，並說：<br>
+                    <code style="background: #edf2f7; padding: 4px 8px; border-radius: 4px; display: inline-block; margin: 4px 0;">「Antigravity，請幫我把這張帳單轉成家庭帳務系統專用的 data.json 格式」</code></li>
+                    <li>下載 Antigravity 瞬間幫您處理好的 <code>data.json</code> 檔案。</li>
+                    <li>在電腦上打開本網頁，左上角切換到對應的月份。</li>
+                    <li>點擊右上角黃色的 <strong>「📂 匯入資料檔 (JSON)」</strong> 上傳，資料就會和手機隨手記的帳完美合併！</li>
+                </ol>
+
+                <h3 style="color: var(--primary-color); margin-bottom: 0.5rem;">🏗️ 系統架構備忘錄</h3>
+                <ul style="padding-left: 1.5rem; margin-bottom: 1.5rem; line-height: 1.8; font-size: 0.9rem;">
+                    <li><strong>💻 程式本機開發位置：</strong><br><code>C:\Users\user\Documents\Vibe Coding\家庭帳務整理</code><br>(使用 VS Code 的 Open with Live Server 測試)</li>
+                    <li><strong>🗄️ 雲端資料庫 (DB)：</strong><br><a href="https://supabase.com" target="_blank" style="color: #3182ce;">Supabase</a> (專案 ID: vawvpyz...uupa)<br>(負責 24 小時即時儲存與同步所有帳務數字)</li>
+                    <li><strong>🐙 版本控制與正式發布網址：</strong><br><a href="https://github.com/oliviakao216/Family-Accounting" target="_blank" style="color: #3182ce;">GitHub (oliviakao216/Family-Accounting)</a><br>(每次修改完程式，將根目錄最外層的 3 個檔案拖曳上傳覆蓋，手機上的網頁就會自動更新)</li>
+                </ul>
+
+
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+                <button id="close-help-btn" class="primary-btn">我瞭解了</button>
             </div>
         </div>
     </div>

@@ -523,5 +523,14 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
     }
 });
 
+// 教學視窗控制
+const helpModal = document.getElementById('help-modal');
+document.getElementById('help-btn').addEventListener('click', () => {
+    helpModal.classList.add('active');
+});
+document.getElementById('close-help-btn').addEventListener('click', () => {
+    helpModal.classList.remove('active');
+});
+
 // 啟動應用程式
 window.addEventListener('DOMContentLoaded', init);
