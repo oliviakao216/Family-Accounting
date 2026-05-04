@@ -3,63 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>家庭帳務整理</title>
-    <style>
-        body { 
-            font-family: 'Inter', 'Segoe UI', 'Microsoft JhengHei', sans-serif; 
-            padding: 4rem; 
-            background-color: #f3f6f9;
-            background-image: radial-gradient(circle at 50% 0%, rgba(76, 81, 191, 0.1) 0%, transparent 50%);
-            text-align: center; 
-            color: #2d3748;
-        }
-        h1 { 
-            font-size: 2.5rem; 
-            margin-bottom: 3rem; 
-            font-weight: 700;
-        }
-        .months-container {
-            display: flex;
-            justify-content: center;
-            gap: 2rem;
-        }
-        .month-card { 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 2rem 3rem; 
-            background: white; 
-            border-radius: 16px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05), 0 10px 15px -3px rgba(0,0,0,0.1); 
-            text-decoration: none; 
-            color: #4c51bf; 
-            font-size: 1.5rem; 
-            font-weight: bold; 
-            transition: all 0.3s ease; 
-            border: 1px solid #e2e8f0;
-        }
-        .month-card:hover { 
-            transform: translateY(-5px); 
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
-            border-color: #4c51bf;
-        }
-        .icon-large {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-    </style>
+    <title>家庭帳務系統 (雲端版)</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- 引入 Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <h1>請選擇月份</h1>
-    <div class="months-container">
-        <a href="202604/index.html" class="month-card">
-            <span class="icon-large">📁</span>
-            2026 年 04 月
-        </a>
-        <a href="202605/index.html" class="month-card">
-            <span class="icon-large">📁</span>
-            2026 年 05 月
-        </a>
+    <div class="app-container">
+        <!-- 頂部標題與控制區 -->
+        <header class="header">
+            <div>
+                <h1>家庭帳務系統 <span style="font-size:1rem; color:#48bb78;">🟢 雲端同步中</span></h1>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                    <span style="font-weight: bold; color: var(--text-secondary);">月份:</span>
+                    <select id="month-selector" class="cat-select" style="font-size: 1.2rem; font-weight: bold; width: auto; border-color: var(--primary-color);">
+                        <option value="202604">2026 年 04 月</option>
+                        <option value="202605" selected>2026 年 05 月</option>
+                        <option value="202606">2026 年 06 月</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
+                <button id="import-btn" class="secondary-btn" style="background-color: #ecc94b; color: #744210;">
+                    <span class="icon">📂</span> 匯入資料檔 (JSON)
+                </button>
+                <input type="file" id="file-upload" accept=".json" style="display: none;">
+                
+                <button id="print-btn" class="primary-btn" style="background-color: #4a5568; border-color: #2d3748;">
+                    <span class="icon">🖨️</span> 匯出 PDF
+                </button>
+                <button id="run-match-btn" class="primary-btn">
+                    <span class="icon">🔍</span> 執行自動比對
+                </button>
+            </div>
+        </header>
+
+        <div class="content-wrapper">
+            <!-- 左側：分類統計小計 -->
+            <aside class="sidebar">
+                <h2>📊 家用分類小計</h2>
+                <div class="summary-list" id="summary-list">
+                    <!-- 分類小計會由 JS 動態生成 -->
+                </div>
+                <div class="total-box" style="margin-bottom: 2rem;">
+                    <span>總支出</span>
+                    <h3 id="grand-total">NT$ 0</h3>
+                </div>
+
+                <h2>📈 家庭開支小計</h2>
+                <div class="summary-list" id="family-summary-list">
+                    <!-- 家庭開支分類小計會由 JS 動態生成 -->
+                </div>
+                <div class="total-box" style="margin-bottom: 2rem;">
+                    <span>總支出</span>
+                    <h3 id="family-grand-total">NT$ 0</h3>
+                </div>
+
+                <div class="total-box" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);">
+                    <span>合併總計 (家用 + 家庭開支)</span>
+                    <h3 id="combined-grand-total">NT$ 0</h3>
+                </div>
+            </aside>
+
+            <!-- 右側：帳務明細表 -->
+            <main class="main-content">
+                <div class="main-header">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <h2>📝 帳務明細 (雲端資料庫)</h2>
+                        <button id="add-manual-btn" class="primary-btn" style="padding: 0.3rem 0.8rem; font-size: 0.85rem; background: #ed8936; border-color: #dd6b20;">
+                            ➕ 隨手記帳
+                        </button>
+                    </div>
+                    <div class="tabs" id="usage-tabs">
+                        <button class="tab-btn active" data-tab="all">全部</button>
+                        <button class="tab-btn" data-tab="家用">家用</button>
+                        <button class="tab-btn" data-tab="私用">私用</button>
+                        <button class="tab-btn" data-tab="家庭開支">家庭開支</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="transaction-table">
+                        <thead>
+                            <tr>
+                                <th>銀行</th>
+                                <th>日期</th>
+                                <th>消費明細</th>
+                                <th>分類 (可修改)</th>
+                                <th>購買項目摘要 (可修改)</th>
+                                <th>歸屬</th>
+                                <th class="text-right">台幣金額</th>
+                                <th class="text-right">外幣金額</th>
+                                <th style="text-align: center;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transaction-body">
+                            <!-- 交易紀錄會由 JS 動態生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
     </div>
+
+    <!-- 衝突選擇彈窗 (Modal) -->
+    <div id="conflict-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚠️ 偵測到相同金額訂單</h2>
+                <p>請為銀行扣款 <strong id="conflict-bank-detail"></strong> (金額: <strong id="conflict-amount"></strong>) 選擇對應的電商訂單：</p>
+            </div>
+            <div class="modal-body" id="conflict-options">
+                <!-- 選項由 JS 產生 -->
+            </div>
+            <div class="modal-footer">
+                <button id="skip-conflict-btn" class="secondary-btn">略過此筆</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 手動新增視窗 -->
+    <div id="manual-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px; padding: 2rem;">
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">➕ 雲端隨手記帳</h3>
+            
+            <label style="font-weight: bold; font-size: 0.9rem;">日期 (格式: YYYY-MM-DD)</label>
+            <input type="text" id="manual-date" class="summary-input" style="width: 100%; margin-bottom: 1rem; border: 1px solid #e2e8f0; padding: 0.5rem;">
+            
+            <label style="font-weight: bold; font-size: 0.9rem;">消費明細</label>
+            <input type="text" id="manual-details" class="summary-input" style="width: 100%; margin-bottom: 0.5rem; border: 1px solid #e2e8f0; padding: 0.5rem;">
+            
+            <!-- 快速輸入標籤區塊 -->
+            <div id="quick-tags" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+                <!-- Tags will be rendered by JS -->
+            </div>
+            
+            <label style="font-weight: bold; font-size: 0.9rem;">金額 (支援算式，如 100+50)</label>
+            <input type="text" id="manual-amount" class="summary-input" style="width: 100%; margin-bottom: 1rem; border: 1px solid #e2e8f0; padding: 0.5rem;" placeholder="例如: 848+550">
+            
+            <label style="font-weight: bold; font-size: 0.9rem;">分類</label>
+            <select id="manual-cat" class="cat-select" style="width: 100%; margin-bottom: 1rem; padding: 0.5rem;"></select>
+            
+            <label style="font-weight: bold; font-size: 0.9rem;">歸屬</label>
+            <select id="manual-usage" class="usage-select" style="width: 100%; margin-bottom: 1.5rem; padding: 0.5rem;">
+                <option value="家用" selected>家用</option>
+                <option value="私用">私用</option>
+                <option value="家庭開支">家庭開支</option>
+            </select>
+            
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button id="cancel-manual-btn" class="primary-btn" style="background: #a0aec0;">取消</button>
+                <button id="confirm-manual-btn" class="primary-btn">儲存至雲端</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
