@@ -465,6 +465,93 @@ body {
     }
 }
 
+@media (max-width: 768px) {
+    html, body {
+        overflow-x: hidden; /* 防止整個網頁橫向滑動 */
+    }
+    .app-container {
+        padding: 0.5rem;
+        width: 100vw;
+        overflow-x: hidden;
+    }
+    .content-wrapper {
+        gap: 1rem;
+    }
+    .sidebar, .main-content {
+        min-width: 0; /* 防止 grid 內容撐破版面 */
+        padding: 1rem;
+    }
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    .header h1 {
+        font-size: 1.5rem;
+    }
+    /* 隱藏桌機專用的繁重功能按鈕，保持手機版極簡 */
+    .desktop-only-btns {
+        display: none !important;
+    }
+    .main-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    .main-header > div:first-child {
+        flex-wrap: wrap; /* 讓標題與記帳按鈕不要互擠 */
+    }
+    .tabs {
+        width: 100%;
+        display: flex;
+        overflow-x: auto;
+    }
+    .tab-btn {
+        flex: 1;
+        white-space: nowrap;
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    /* 拯救被擠壓成直排的表格！ */
+    .table-container {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* 讓手機滑動更順暢 */
+    }
+    .transaction-table {
+        min-width: 750px; /* 強制表格維持寬度，不允許被擠壓 */
+    }
+    .transaction-table th, .transaction-table td {
+        white-space: nowrap; /* 標題與大部分內容絕對不允許直排 */
+    }
+    .detail-text {
+        white-space: normal; /* 只有明細太長時可以換兩行 */
+        min-width: 120px;
+    }
+    
+    .summary-input {
+        width: 100%;
+    }
+    .total-box {
+        padding: 1rem;
+    }
+    .total-box h3 {
+        font-size: 1.5rem;
+    }
+    
+    /* 手機版小計收合機制 */
+    #mobile-sidebar-toggle {
+        display: flex !important;
+    }
+    #sidebar-content {
+        display: none;
+    }
+    #sidebar-content.active {
+        display: block;
+    }
+}
+
 /* 快速標籤按鈕 */
 .quick-tag {
     background: #e2e8f0;

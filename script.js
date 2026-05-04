@@ -22,7 +22,8 @@ let state = {
     bankRecords: [],
     ecommerceOrders: [],
     currentMonth: document.getElementById('month-selector').value,
-    currentTab: 'all'
+    currentTab: 'all',
+    editingId: null
 };
 
 // DOM 元素
@@ -196,6 +197,9 @@ async function updateRecordInDb(id, updates) {
     if (updates.category !== undefined) dbUpdates.category = updates.category;
     if (updates.usageType !== undefined) dbUpdates.usage_type = updates.usageType;
     if (updates.customSummary !== undefined) dbUpdates.custom_summary = updates.customSummary;
+    if (updates.date !== undefined) dbUpdates.date = updates.date;
+    if (updates.details !== undefined) dbUpdates.details = updates.details;
+    if (updates.amountTWD !== undefined) dbUpdates.amount_twd = updates.amountTWD;
     
     await supabaseClient.from('transactions').update(dbUpdates).eq('id', id);
 }
@@ -250,7 +254,13 @@ function renderTable() {
         const twdTd = `<td class="text-right amount ${record.amountTWD < 0 ? 'negative' : ''}">${record.amountTWD}</td>`;
         const forTd = `<td class="text-right">${record.amountForeign ? record.amountForeign + ' ' + record.currency : '-'}</td>`;
 
-        const actionTd = `<td style="text-align: center;"><button class="delete-btn" data-id="${record.id}" title="刪除此紀錄">🗑️</button></td>`;
+        const isManual = record.bank === "手帳" || record.id.startsWith("m_");
+        const actionTd = `
+            <td style="text-align: center; white-space: nowrap;">
+                ${isManual ? `<button class="edit-btn secondary-btn" data-id="${record.id}" title="修改此紀錄" style="padding:0.2rem; font-size:0.8rem; margin-right:4px;">✏️</button>` : ''}
+                <button class="delete-btn" data-id="${record.id}" title="刪除此紀錄">🗑️</button>
+            </td>
+        `;
 
         tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + usageTd + twdTd + forTd + actionTd;
         tableBody.appendChild(tr);
@@ -291,6 +301,29 @@ function renderTable() {
             const id = e.target.getAttribute('data-id');
             updateRecordInDb(id, { customSummary: e.target.value });
             e.target.classList.toggle('empty', !e.target.value);
+        });
+    });
+
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.target.getAttribute('data-id');
+            const record = state.bankRecords.find(r => r.id === id);
+            if (!record) return;
+            
+            state.editingId = id;
+            document.querySelector('#manual-modal h3').textContent = '✏️ 編輯隨手記帳';
+            
+            const catSelect = document.getElementById('manual-cat');
+            catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            document.getElementById('manual-date').value = record.date;
+            document.getElementById('manual-details').value = record.details;
+            document.getElementById('manual-amount').value = record.amountTWD;
+            document.getElementById('manual-cat').value = record.category;
+            document.getElementById('manual-usage').value = record.usageType;
+            
+            renderQuickTags();
+            document.getElementById('manual-modal').classList.add('active');
         });
     });
 
@@ -390,11 +423,21 @@ function renderQuickTags() {
 // 手動新增視窗
 const manualModal = document.getElementById('manual-modal');
 addManualBtn.addEventListener('click', () => {
+    state.editingId = null;
+    document.querySelector('#manual-modal h3').textContent = '➕ 雲端隨手記帳';
+    
     const catSelect = document.getElementById('manual-cat');
     catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
     document.getElementById('manual-details').value = "";
     document.getElementById('manual-amount').value = "";
     document.getElementById('manual-usage').value = "家用";
+    
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    document.getElementById('manual-date').value = `${yyyy}-${mm}-${dd}`;
+    
     renderQuickTags();
     manualModal.classList.add('active');
 });
@@ -428,38 +471,52 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
     btn.disabled = true;
     btn.textContent = "上傳中...";
 
-    const newRecord = {
-        id: "m_" + Date.now(),
-        month: state.currentMonth,
-        bank: "手帳",
-        date: date,
-        details: details,
-        amount_twd: amountTWD,
-        amount_foreign: null,
-        currency: "TWD",
-        category: cat,
-        usage_type: usage
-    };
-
     try {
-        const { error } = await supabaseClient.from('transactions').insert([newRecord]);
-        if (error) throw error;
-        
-        // 更新畫面
-        state.bankRecords.unshift({
-            id: newRecord.id, month: newRecord.month, bank: newRecord.bank,
-            date: newRecord.date, details: newRecord.details, amountTWD: newRecord.amount_twd,
-            amountForeign: newRecord.amount_foreign, currency: newRecord.currency,
-            category: newRecord.category, usageType: newRecord.usage_type
-        });
-        
-        autoCategorizeBase();
-        renderTable();
-        updateSummary();
-        manualModal.classList.remove('active');
+        if (state.editingId) {
+            // 更新舊有紀錄
+            await updateRecordInDb(state.editingId, {
+                date: date,
+                details: details,
+                amountTWD: amountTWD,
+                category: cat,
+                usageType: usage
+            });
+            renderTable();
+            manualModal.classList.remove('active');
+        } else {
+            // 新增紀錄
+            const newRecord = {
+                id: "m_" + Date.now(),
+                month: state.currentMonth,
+                bank: "手帳",
+                date: date,
+                details: details,
+                amount_twd: amountTWD,
+                amount_foreign: null,
+                currency: "TWD",
+                category: cat,
+                usage_type: usage
+            };
+
+            const { error } = await supabaseClient.from('transactions').insert([newRecord]);
+            if (error) throw error;
+            
+            // 更新畫面
+            state.bankRecords.unshift({
+                id: newRecord.id, month: newRecord.month, bank: newRecord.bank,
+                date: newRecord.date, details: newRecord.details, amountTWD: newRecord.amount_twd,
+                amountForeign: newRecord.amount_foreign, currency: newRecord.currency,
+                category: newRecord.category, usageType: newRecord.usage_type
+            });
+            
+            autoCategorizeBase();
+            renderTable();
+            updateSummary();
+            manualModal.classList.remove('active');
+        }
     } catch (error) {
-        console.error("新增失敗", error);
-        alert("新增失敗，請檢查網路連線。");
+        console.error("儲存失敗", error);
+        alert("儲存失敗，請檢查網路連線。");
     } finally {
         btn.disabled = false;
         btn.textContent = "儲存至雲端";

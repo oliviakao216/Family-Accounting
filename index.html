@@ -23,7 +23,7 @@
                     </select>
                 </div>
             </div>
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
+            <div class="desktop-only-btns" style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
                 <button id="import-btn" class="secondary-btn" style="background-color: #ecc94b; color: #744210;">
                     <span class="icon">📂</span> 匯入資料檔 (JSON)
                 </button>
@@ -41,27 +41,35 @@
         <div class="content-wrapper">
             <!-- 左側：分類統計小計 -->
             <aside class="sidebar">
-                <h2>📊 家用分類小計</h2>
-                <div class="summary-list" id="summary-list">
-                    <!-- 分類小計會由 JS 動態生成 -->
-                </div>
-                <div class="total-box" style="margin-bottom: 2rem;">
-                    <span>總支出</span>
-                    <h3 id="grand-total">NT$ 0</h3>
-                </div>
+                <!-- 手機版專用收合按鈕 -->
+                <button id="mobile-sidebar-toggle" class="secondary-btn" style="width: 100%; margin-bottom: 1rem; display: none; justify-content: space-between; align-items: center; border-color: var(--primary-color);" onclick="document.getElementById('sidebar-content').classList.toggle('active'); this.querySelector('span:last-child').textContent = document.getElementById('sidebar-content').classList.contains('active') ? '▲' : '▼';">
+                    <span style="font-weight: bold; font-size: 1.1rem; color: var(--primary-color);">📊 點擊展開當月總計與分類</span>
+                    <span>▼</span>
+                </button>
 
-                <h2>📈 家庭開支小計</h2>
-                <div class="summary-list" id="family-summary-list">
-                    <!-- 家庭開支分類小計會由 JS 動態生成 -->
-                </div>
-                <div class="total-box" style="margin-bottom: 2rem;">
-                    <span>總支出</span>
-                    <h3 id="family-grand-total">NT$ 0</h3>
-                </div>
+                <div id="sidebar-content">
+                    <h2>📊 家用分類小計</h2>
+                    <div class="summary-list" id="summary-list">
+                        <!-- 分類小計會由 JS 動態生成 -->
+                    </div>
+                    <div class="total-box" style="margin-bottom: 2rem;">
+                        <span>總支出</span>
+                        <h3 id="grand-total">NT$ 0</h3>
+                    </div>
 
-                <div class="total-box" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);">
-                    <span>合併總計 (家用 + 家庭開支)</span>
-                    <h3 id="combined-grand-total">NT$ 0</h3>
+                    <h2>📈 家庭開支小計</h2>
+                    <div class="summary-list" id="family-summary-list">
+                        <!-- 家庭開支分類小計會由 JS 動態生成 -->
+                    </div>
+                    <div class="total-box" style="margin-bottom: 2rem;">
+                        <span>總支出</span>
+                        <h3 id="family-grand-total">NT$ 0</h3>
+                    </div>
+
+                    <div class="total-box" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);">
+                        <span>合併總計 (家用 + 家庭開支)</span>
+                        <h3 id="combined-grand-total">NT$ 0</h3>
+                    </div>
                 </div>
             </aside>
 
