@@ -349,7 +349,7 @@ function updateSummary() {
 
     state.bankRecords.forEach(r => {
         const amt = parseFloat(r.amountTWD);
-        if (!isNaN(amt) && amt > 0) {
+        if (!isNaN(amt) && amt !== 0) {
             if (r.usageType === '家用') {
                 summary[r.category] += amt;
                 grandTotal += amt;
@@ -371,10 +371,10 @@ function updateSummary() {
     };
 
     CATEGORIES.forEach(cat => {
-        if (cat !== "未分類" && summary[cat] > 0) {
+        if (cat !== "未分類" && summary[cat] !== 0) {
             summaryList.innerHTML += `<div class="summary-item"><div class="summary-label"><span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>${cat}</div><div class="summary-value">NT$ ${summary[cat]}</div></div>`;
         }
-        if (cat !== "未分類" && familySummary[cat] > 0 && familySummaryList) {
+        if (cat !== "未分類" && familySummary[cat] !== 0 && familySummaryList) {
             familySummaryList.innerHTML += `<div class="summary-item"><div class="summary-label"><span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>${cat}</div><div class="summary-value">NT$ ${familySummary[cat]}</div></div>`;
         }
     });
