@@ -303,9 +303,8 @@ function renderTable() {
 
         const invoiceTd = `
             <td style="text-align: center;">
-                <label style="cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.9rem; margin: 0;">
+                <label style="cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 0;">
                     <input type="checkbox" class="invoice-checkbox" data-id="${record.id}" ${hasInvoice ? 'checked' : ''}>
-                    發票
                 </label>
             </td>
         `;
