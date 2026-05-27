@@ -21,6 +21,8 @@ if (savedCat) {
 let state = {
     bankRecords: [],
     ecommerceOrders: [],
+    conflicts: [], // 需要手動選擇的衝突清單
+    currentConflict: null,
     currentMonth: document.getElementById('month-selector').value,
     currentTab: 'all',
     editingId: null
@@ -34,12 +36,29 @@ const addManualBtn = document.getElementById('add-manual-btn');
 const importBtn = document.getElementById('import-btn');
 const fileUpload = document.getElementById('file-upload');
 const monthSelector = document.getElementById('month-selector');
+const runMatchBtn = document.getElementById('run-match-btn');
+const modal = document.getElementById('conflict-modal');
+const optionsContainer = document.getElementById('conflict-options');
 
 // 切換月份
 monthSelector.addEventListener('change', (e) => {
     state.currentMonth = e.target.value;
+    const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
+    state.ecommerceOrders = savedOrders ? JSON.parse(savedOrders) : [];
+    // 重設比對按鈕狀態
+    resetMatchButton();
     loadData();
 });
+
+// 重設比對按鈕
+function resetMatchButton() {
+    runMatchBtn.disabled = false;
+    runMatchBtn.style.backgroundColor = '';
+    runMatchBtn.style.cursor = '';
+    runMatchBtn.style.boxShadow = '';
+    runMatchBtn.style.transform = '';
+    runMatchBtn.innerHTML = '<span class="icon">🔍</span> 執行自動比對';
+}
 
 // 初始化
 async function init() {
@@ -61,6 +80,12 @@ async function init() {
     const dd = String(today.getDate()).padStart(2, '0');
     document.getElementById('manual-date').value = `${yyyy}-${mm}-${dd}`;
 
+    // 嘗試載入當前月份已快取的電商訂單
+    const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
+    if (savedOrders) {
+        state.ecommerceOrders = JSON.parse(savedOrders);
+    }
+
     await loadData();
 }
 
@@ -78,20 +103,30 @@ async function loadData() {
         if (error) throw error;
 
         // 將資料庫的蛇形命名 (snake_case) 轉回原本的駝峰命名 (camelCase)
-        state.bankRecords = data.map(r => ({
-            id: r.id,
-            month: r.month,
-            bank: r.bank,
-            date: r.date,
-            details: r.details,
-            amountTWD: r.amount_twd,
-            amountForeign: r.amount_foreign,
-            currency: r.currency,
-            category: r.category,
-            usageType: r.usage_type,
-            customSummary: r.custom_summary,
-            matchedOrder: r.matched_order
-        }));
+        state.bankRecords = data.map(r => {
+            const matchedOrd = state.ecommerceOrders.find(o => o.id === r.matched_order);
+            return {
+                id: r.id,
+                month: r.month,
+                bank: r.bank,
+                date: r.date,
+                details: r.details,
+                amountTWD: r.amount_twd,
+                amountForeign: r.amount_foreign,
+                currency: r.currency,
+                category: r.category,
+                usageType: r.usage_type,
+                customSummary: r.custom_summary,
+                matchedOrder: r.matched_order,
+                matchedItems: matchedOrd ? matchedOrd.items : []
+            };
+        });
+        
+        // 標記已經配對過的電商訂單為已配對，避免重複被配對
+        state.ecommerceOrders.forEach(o => {
+            const isMatched = state.bankRecords.some(r => r.matchedOrder === o.id);
+            o.isMatched = isMatched;
+        });
         
         // 自動分類 (如果還沒分類)
         autoCategorizeBase();
@@ -122,8 +157,15 @@ fileUpload.addEventListener('change', (e) => {
                 return;
             }
             
-            alert(`讀取到 ${data.bankRecords.length} 筆資料！\n即將上傳至 ${state.currentMonth} 月份雲端資料庫...\n(請耐心等候幾秒鐘)`);
+            alert(`讀取到 ${data.bankRecords.length} 筆銀行紀錄！\n即將上傳至 ${state.currentMonth} 月份雲端資料庫...\n(請耐心等候幾秒鐘)`);
             
+            // 處理電商訂單快取
+            if (data.ecommerceOrders) {
+                state.ecommerceOrders = data.ecommerceOrders;
+                localStorage.setItem('ecommerceOrders_' + state.currentMonth, JSON.stringify(data.ecommerceOrders));
+                resetMatchButton();
+            }
+
             // 轉換為資料庫格式
             const insertData = data.bankRecords.map(r => ({
                 id: r.id || "m_" + Date.now() + Math.random(),
@@ -200,6 +242,7 @@ async function updateRecordInDb(id, updates) {
     if (updates.date !== undefined) dbUpdates.date = updates.date;
     if (updates.details !== undefined) dbUpdates.details = updates.details;
     if (updates.amountTWD !== undefined) dbUpdates.amount_twd = updates.amountTWD;
+    if (updates.matchedOrder !== undefined) dbUpdates.matched_order = updates.matchedOrder;
     
     await supabaseClient.from('transactions').update(dbUpdates).eq('id', id);
 }
@@ -236,10 +279,18 @@ function renderTable() {
         catOptions += `<option value="ADD_NEW" style="font-weight: bold; color: var(--primary-color);">➕ 新增分類...</option>`;
         const catTd = `<td><select class="cat-select" data-id="${record.id}">${catOptions}</select></td>`;
         
+        let countHtml = '';
         let summaryText = record.customSummary || '';
+        if (!record.customSummary && record.matchedItems && record.matchedItems.length > 0) {
+            const count = record.matchedItems.length;
+            summaryText = record.matchedItems.slice(0, 2).map(i => i.name).join('、');
+            if (count > 2) summaryText += '...等';
+            countHtml = `<span class="item-count" style="font-size:0.75rem; background:#ebf8ff; color:#2b6cb0; padding:2px 6px; border-radius:4px; margin-right:4px; white-space:nowrap;">共 ${count} 項</span>`;
+        }
         const itemTd = `
             <td>
-                <div class="item-summary">
+                <div class="item-summary" style="display:flex; align-items:center;">
+                    ${countHtml}
                     <input type="text" class="summary-input ${!summaryText ? 'empty' : ''}" 
                            data-id="${record.id}" value="${summaryText}" placeholder="點擊輸入摘要...">
                 </div>
@@ -530,6 +581,164 @@ document.getElementById('help-btn').addEventListener('click', () => {
 });
 document.getElementById('close-help-btn').addEventListener('click', () => {
     helpModal.classList.remove('active');
+});
+
+// ==================== 自動比對與衝突處理 ====================
+
+// 執行自動比對
+runMatchBtn.addEventListener('click', async () => {
+    if (!state.ecommerceOrders || state.ecommerceOrders.length === 0) {
+        alert("請先點擊右上角黃色的「📂 匯入資料檔 (JSON)」，匯入含有電商訂單的 JSON 檔後再執行自動比對！");
+        return;
+    }
+
+    state.conflicts = [];
+    
+    // 找出需要比對的銀行紀錄 (關鍵字含蝦皮、酷澎、momo) 且尚未匹配的
+    const targetRecords = state.bankRecords.filter(r => 
+        /蝦皮|酷澎|momo/i.test(r.details) && !r.matchedOrder
+    );
+
+    if (targetRecords.length === 0) {
+        alert('沒有找到需要比對的蝦皮、酷澎或 momo 紀錄，或者所有紀錄皆已完成配對！');
+        return;
+    }
+
+    // 禁用按鈕顯示進行中
+    runMatchBtn.disabled = true;
+    runMatchBtn.innerHTML = '⏳ 正在執行自動比對...';
+
+    try {
+        for (const record of targetRecords) {
+            // 尋找相同金額的電商訂單
+            const matchedOrders = state.ecommerceOrders.filter(o => o.total === record.amountTWD && !o.isMatched);
+            
+            if (matchedOrders.length === 1) {
+                // 單一符合，自動配對
+                await matchRecordToOrder(record, matchedOrders[0]);
+            } else if (matchedOrders.length > 1) {
+                // 多個符合，加入衝突清單
+                state.conflicts.push({
+                    record: record,
+                    options: matchedOrders
+                });
+            }
+        }
+
+        // 處理衝突
+        if (state.conflicts.length > 0) {
+            processNextConflict();
+        } else {
+            alert('比對完成！沒有遇到金額衝突。所有匹配結果已同步至雲端。');
+            renderTable();
+            updateSummary();
+            setButtonDone();
+        }
+    } catch (e) {
+        console.error("比對出錯：", e);
+        alert("自動比對時發生錯誤，請重新整理頁面再試。");
+        resetMatchButton();
+    }
+});
+
+// 設定按鈕為已完成的灰色狀態
+function setButtonDone() {
+    runMatchBtn.disabled = true;
+    runMatchBtn.style.backgroundColor = '#a0aec0';
+    runMatchBtn.style.cursor = 'not-allowed';
+    runMatchBtn.style.boxShadow = 'none';
+    runMatchBtn.style.transform = 'none';
+    runMatchBtn.innerHTML = '<span class="icon">✔️</span> 蝦皮/酷澎/momo 已比對完成';
+}
+
+// 配對銀行與訂單，並更新至 Supabase 雲端
+async function matchRecordToOrder(record, order) {
+    order.isMatched = true; // 標記為已配對，避免重複被其他紀錄匹配
+    
+    // 根據購買項目更新分類
+    updateCategoryFromItems(record, order.items);
+    
+    // 更新至 Supabase 雲端
+    await updateRecordInDb(record.id, {
+        matchedOrder: order.id,
+        category: record.category
+    });
+    
+    // 建立本地 matchedItems 關聯，方便畫面即時渲染
+    record.matchedItems = order.items;
+}
+
+// 根據電商購買商品自動更新分類
+function updateCategoryFromItems(record, items) {
+    const itemNames = items.map(i => i.name).join(" ");
+    if (/尿布|補體康|濕紙巾|足貼|生理食鹽水|棉棒|紗布巾/.test(itemNames)) {
+        record.category = "母親照顧";
+    } else if (/記憶卡|衛生紙|牙膏/.test(itemNames)) {
+        record.category = "家用";
+    } else if (/蛋白粉|水肌|包子|饅頭/.test(itemNames)) {
+        record.category = "食";
+    } else if (/健康日記/.test(itemNames)) {
+        record.category = "醫療";
+    }
+}
+
+// 處理衝突佇列
+function processNextConflict() {
+    if (state.conflicts.length === 0) {
+        alert('所有衝突已處理完成！比對結果已同步至雲端。');
+        renderTable();
+        updateSummary();
+        modal.classList.remove('active');
+        setButtonDone();
+        return;
+    }
+
+    state.currentConflict = state.conflicts.shift();
+    const record = state.currentConflict.record;
+    const options = state.currentConflict.options;
+
+    document.getElementById('conflict-bank-detail').textContent = `${record.bank} (${record.details})`;
+    document.getElementById('conflict-amount').textContent = `NT$ ${record.amountTWD}`;
+
+    optionsContainer.innerHTML = '';
+    options.forEach(opt => {
+        const itemsText = opt.items.map(i => `${i.name} (單價: $${i.price}, 數量: ${i.qty})`).join(', ');
+        const card = document.createElement('div');
+        card.className = 'option-card';
+        card.style.border = '1px solid #e2e8f0';
+        card.style.borderRadius = '8px';
+        card.style.padding = '1rem';
+        card.style.marginBottom = '0.5rem';
+        card.style.display = 'flex';
+        card.style.justifyContent = 'space-between';
+        card.style.alignItems = 'center';
+        
+        card.innerHTML = `
+            <div class="option-info" style="flex: 1; padding-right: 1rem;">
+                <h4 style="color: var(--primary-color); margin-bottom: 0.25rem;">${opt.platform} - 總額 $${opt.total} (日期: ${opt.date})</h4>
+                <p style="font-size: 0.85rem; color: #4a5568;">項目: ${itemsText}</p>
+            </div>
+            <button class="primary-btn" style="padding: 0.5rem 1rem; font-size:0.85rem; white-space:nowrap;">選取此項</button>
+        `;
+        
+        card.querySelector('button').addEventListener('click', async (e) => {
+            // 禁用按鈕防連點
+            e.target.disabled = true;
+            e.target.textContent = '同步中...';
+            
+            await matchRecordToOrder(record, opt);
+            processNextConflict();
+        });
+        
+        optionsContainer.appendChild(card);
+    });
+
+    modal.classList.add('active');
+}
+
+// 略過衝突按鈕
+document.getElementById('skip-conflict-btn').addEventListener('click', () => {
+    processNextConflict();
 });
 
 // 啟動應用程式
