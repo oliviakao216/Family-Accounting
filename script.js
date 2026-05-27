@@ -287,13 +287,26 @@ function renderTable() {
             if (count > 2) summaryText += '...等';
             countHtml = `<span class="item-count" style="font-size:0.75rem; background:#ebf8ff; color:#2b6cb0; padding:2px 6px; border-radius:4px; margin-right:4px; white-space:nowrap;">共 ${count} 項</span>`;
         }
+
+        const hasInvoice = (record.customSummary && record.customSummary.includes(' [發票]'));
+        const displaySummary = summaryText.replace(' [發票]', '');
+
         const itemTd = `
             <td>
                 <div class="item-summary" style="display:flex; align-items:center;">
                     ${countHtml}
-                    <input type="text" class="summary-input ${!summaryText ? 'empty' : ''}" 
-                           data-id="${record.id}" value="${summaryText}" placeholder="點擊輸入摘要...">
+                    <input type="text" class="summary-input ${!displaySummary ? 'empty' : ''}" 
+                           data-id="${record.id}" value="${displaySummary}" placeholder="點擊輸入摘要...">
                 </div>
+            </td>
+        `;
+
+        const invoiceTd = `
+            <td style="text-align: center;">
+                <label style="cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.9rem; margin: 0;">
+                    <input type="checkbox" class="invoice-checkbox" data-id="${record.id}" ${hasInvoice ? 'checked' : ''}>
+                    發票
+                </label>
             </td>
         `;
 
@@ -313,7 +326,7 @@ function renderTable() {
             </td>
         `;
 
-        tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + usageTd + twdTd + forTd + actionTd;
+        tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + invoiceTd + usageTd + twdTd + forTd + actionTd;
         tableBody.appendChild(tr);
     });
 
@@ -350,8 +363,51 @@ function renderTable() {
     document.querySelectorAll('.summary-input').forEach(input => {
         input.addEventListener('change', (e) => {
             const id = e.target.getAttribute('data-id');
-            updateRecordInDb(id, { customSummary: e.target.value });
-            e.target.classList.toggle('empty', !e.target.value);
+            const record = state.bankRecords.find(r => r.id === id);
+            if (!record) return;
+
+            const isChecked = (record.customSummary && record.customSummary.includes(' [發票]'));
+            let newText = e.target.value.trim();
+            
+            // 避免重複附加
+            newText = newText.replace(' [發票]', '');
+            
+            if (isChecked) {
+                newText += ' [發票]';
+            }
+            
+            updateRecordInDb(id, { customSummary: newText });
+            e.target.classList.toggle('empty', !e.target.value.trim());
+        });
+    });
+
+    document.querySelectorAll('.invoice-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            const id = e.target.getAttribute('data-id');
+            const record = state.bankRecords.find(r => r.id === id);
+            if (!record) return;
+
+            let currentSummary = record.customSummary || '';
+            const isChecked = e.target.checked;
+
+            if (isChecked) {
+                if (!currentSummary.includes(' [發票]')) {
+                    currentSummary = currentSummary ? `${currentSummary} [發票]` : ' [發票]';
+                }
+            } else {
+                currentSummary = currentSummary.replace(' [發票]', '');
+            }
+
+            // 同步至 Supabase 雲端
+            updateRecordInDb(id, { customSummary: currentSummary });
+
+            // 更新同一列的輸入框文字（去掉標記）
+            const row = e.target.closest('tr');
+            const input = row.querySelector('.summary-input');
+            if (input) {
+                input.value = currentSummary.replace(' [發票]', '');
+                input.classList.toggle('empty', !input.value);
+            }
         });
     });
 
