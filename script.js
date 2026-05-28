@@ -86,6 +86,9 @@ async function init() {
         state.ecommerceOrders = JSON.parse(savedOrders);
     }
 
+    // 初始化金鑰設定與 AI 解析
+    initSettingsAndAI();
+
     await loadData();
 }
 
@@ -105,6 +108,15 @@ async function loadData() {
         // 將資料庫的蛇形命名 (snake_case) 轉回原本的駝峰命名 (camelCase)
         state.bankRecords = data.map(r => {
             const matchedOrd = state.ecommerceOrders.find(o => o.id === r.matched_order);
+            let customSum = r.custom_summary;
+            if (!customSum && matchedOrd) {
+                const count = matchedOrd.items.length;
+                let autoText = matchedOrd.items.slice(0, 2).map(i => i.name).join('、');
+                if (count > 2) autoText += '...等';
+                customSum = autoText;
+                // 背景補寫入 Supabase 雲端，防止跨終端快取缺漏
+                updateRecordInDb(r.id, { customSummary: autoText });
+            }
             return {
                 id: r.id,
                 month: r.month,
@@ -116,7 +128,7 @@ async function loadData() {
                 currency: r.currency,
                 category: r.category,
                 usageType: r.usage_type,
-                customSummary: r.custom_summary,
+                customSummary: customSum,
                 matchedOrder: r.matched_order,
                 matchedItems: matchedOrd ? matchedOrd.items : []
             };
@@ -152,45 +164,64 @@ fileUpload.addEventListener('change', (e) => {
     reader.onload = async (event) => {
         try {
             const data = JSON.parse(event.target.result);
-            if (!data.bankRecords) {
-                alert("錯誤：這不是正確的格式");
+            if (!data.bankRecords && !data.ecommerceOrders) {
+                alert("錯誤：這不是正確的格式（找不到銀行紀錄或電商訂單）");
                 return;
             }
             
-            alert(`讀取到 ${data.bankRecords.length} 筆銀行紀錄！\n即將上傳至 ${state.currentMonth} 月份雲端資料庫...\n(請耐心等候幾秒鐘)`);
-            
+            let loadedOrders = false;
             // 處理電商訂單快取
-            if (data.ecommerceOrders) {
+            if (data.ecommerceOrders && data.ecommerceOrders.length > 0) {
                 state.ecommerceOrders = data.ecommerceOrders;
                 localStorage.setItem('ecommerceOrders_' + state.currentMonth, JSON.stringify(data.ecommerceOrders));
                 resetMatchButton();
+                loadedOrders = true;
             }
 
-            // 轉換為資料庫格式
-            const insertData = data.bankRecords.map(r => ({
-                id: r.id || "m_" + Date.now() + Math.random(),
-                month: state.currentMonth,
-                bank: r.bank,
-                date: r.date,
-                details: r.details,
-                amount_twd: r.amountTWD,
-                amount_foreign: r.amountForeign || null,
-                currency: r.currency || 'TWD',
-                category: r.category || '未分類',
-                usage_type: r.usageType || '家用',
-                custom_summary: r.customSummary || null,
-                matched_order: r.matchedOrder || null
-            }));
+            // 如果有銀行交易紀錄，詢問是否要同步寫入雲端
+            if (data.bankRecords && data.bankRecords.length > 0) {
+                const confirmUpload = confirm(
+                    `此檔案包含 ${data.bankRecords.length} 筆銀行交易紀錄！\n\n請問您是否要將這些銀行交易寫入雲端資料庫？\n\n【重要提示】：\n如果您之前已經匯入過此帳單（例如聯邦或中信信用卡帳目），請點擊「取消」，以防止資料重複！系統仍會順利載入電商商品明細以供比對。`
+                );
+                
+                if (confirmUpload) {
+                    // 轉換為資料庫格式
+                    const insertData = data.bankRecords.map(r => ({
+                        id: r.id || "m_" + Date.now() + Math.random(),
+                        month: state.currentMonth,
+                        bank: r.bank,
+                        date: r.date,
+                        details: r.details,
+                        amount_twd: r.amountTWD,
+                        amount_foreign: r.amountForeign || null,
+                        currency: r.currency || 'TWD',
+                        category: r.category || '未分類',
+                        usage_type: r.usageType || '家用',
+                        custom_summary: r.customSummary || null,
+                        matched_order: r.matchedOrder || null
+                    }));
 
-            // 批次寫入 Supabase (使用 upsert 避免重複 ID 報錯)
-            const { error } = await supabaseClient
-                .from('transactions')
-                .upsert(insertData, { onConflict: 'id' });
+                    // 批次寫入 Supabase (使用 upsert 避免重複 ID 報錯)
+                    const { error } = await supabaseClient
+                        .from('transactions')
+                        .upsert(insertData, { onConflict: 'id' });
 
-            if (error) throw error;
-            
-            alert('✅ 匯入成功！資料已經永久保存在雲端！');
-            loadData(); // 重新載入
+                    if (error) throw error;
+                    
+                    alert('✅ 匯入成功！銀行交易與電商明細已成功載入並永久保存在雲端！');
+                    await loadData(); // 重新載入
+                } else {
+                    if (loadedOrders) {
+                        alert('ℹ️ 已載入電商訂單以供比對，已略過寫入銀行交易以防重複！');
+                    }
+                    await loadData(); // 重新載入以渲染更新
+                }
+            } else {
+                if (loadedOrders) {
+                    alert('✅ 電商訂單已成功載入以供比對！');
+                    await loadData();
+                }
+            }
         } catch (error) {
             console.error("匯入失敗", error);
             alert("匯入失敗：" + error.message);
@@ -262,6 +293,16 @@ async function deleteRecordInDb(id) {
 function renderTable() {
     tableBody.innerHTML = '';
     
+    // 更新年份與月份顯示
+    const yearLabel = document.getElementById('year-label');
+    const monthLabel = document.getElementById('month-label');
+    if (state.currentMonth && state.currentMonth.length === 6) {
+        const year = state.currentMonth.substring(0, 4);
+        const month = parseInt(state.currentMonth.substring(4, 6), 10).toString(); // "05" -> "5"
+        if (yearLabel) yearLabel.textContent = year;
+        if (monthLabel) monthLabel.textContent = month;
+    }
+    
     const filteredRecords = state.bankRecords.filter(record => 
         state.currentTab === 'all' || record.usageType === state.currentTab
     );
@@ -270,7 +311,16 @@ function renderTable() {
         const tr = document.createElement('tr');
         
         const bankTd = `<td><span class="bank-tag">${record.bank}</span></td>`;
-        const dateTd = `<td>${record.date}</td>`;
+        
+        // 將 "YYYY-MM-DD" 格式化為 "MM/DD"
+        let displayDate = record.date;
+        if (record.date && record.date.includes('-')) {
+            const parts = record.date.split('-');
+            if (parts.length === 3) {
+                displayDate = `${parts[1]}/${parts[2]}`;
+            }
+        }
+        const dateTd = `<td>${displayDate}</td>`;
         const detailTd = `<td class="detail-text">${record.details}</td>`;
         
         let catOptions = CATEGORIES.map(c => 
@@ -448,6 +498,7 @@ function renderTable() {
 function updateSummary() {
     const summary = {};
     let grandTotal = 0;
+    let householdInvoiceTotal = 0;
     const familySummary = {};
     let familyGrandTotal = 0;
 
@@ -459,6 +510,9 @@ function updateSummary() {
             if (r.usageType === '家用') {
                 summary[r.category] += amt;
                 grandTotal += amt;
+                if (r.customSummary && r.customSummary.includes(' [發票]')) {
+                    householdInvoiceTotal += amt;
+                }
             } else if (r.usageType === '家庭開支') {
                 familySummary[r.category] += amt;
                 familyGrandTotal += amt;
@@ -486,6 +540,8 @@ function updateSummary() {
     });
 
     grandTotalEl.textContent = `NT$ ${grandTotal}`;
+    const hhInvoiceEl = document.getElementById('household-invoice-total');
+    if (hhInvoiceEl) hhInvoiceEl.textContent = `NT$ ${householdInvoiceTotal}`;
     const fGT = document.getElementById('family-grand-total');
     if (fGT) fGT.textContent = `NT$ ${familyGrandTotal}`;
     const cGT = document.getElementById('combined-grand-total');
@@ -713,10 +769,24 @@ async function matchRecordToOrder(record, order) {
     // 根據購買項目更新分類
     updateCategoryFromItems(record, order.items);
     
-    // 更新至 Supabase 雲端
+    // 生成自動帶入的商品摘要文字 (例如: "商品A、商品B...等")
+    const count = order.items.length;
+    let autoSummaryText = order.items.slice(0, 2).map(i => i.name).join('、');
+    if (count > 2) autoSummaryText += '...等';
+    
+    // 保留原本可能有的發票標記
+    let newSummary = autoSummaryText;
+    if (record.customSummary && record.customSummary.includes(' [發票]')) {
+        newSummary += ' [發票]';
+    }
+    
+    record.customSummary = newSummary; // 更新本地狀態
+    
+    // 更新至 Supabase 雲端 (包含寫入 custom_summary)
     await updateRecordInDb(record.id, {
         matchedOrder: order.id,
-        category: record.category
+        category: record.category,
+        customSummary: newSummary
     });
     
     // 建立本地 matchedItems 關聯，方便畫面即時渲染
@@ -773,14 +843,10 @@ function processNextConflict() {
                 <h4 style="color: var(--primary-color); margin-bottom: 0.25rem;">${opt.platform} - 總額 $${opt.total} (日期: ${opt.date})</h4>
                 <p style="font-size: 0.85rem; color: #4a5568;">項目: ${itemsText}</p>
             </div>
-            <button class="primary-btn" style="padding: 0.5rem 1rem; font-size:0.85rem; white-space:nowrap;">選取此項</button>
+            <button class="primary-btn" style="padding: 0.5rem 1rem; font-size:0.9rem;">選擇此項</button>
         `;
         
-        card.querySelector('button').addEventListener('click', async (e) => {
-            // 禁用按鈕防連點
-            e.target.disabled = true;
-            e.target.textContent = '同步中...';
-            
+        card.querySelector('button').addEventListener('click', async () => {
             await matchRecordToOrder(record, opt);
             processNextConflict();
         });
@@ -795,6 +861,374 @@ function processNextConflict() {
 document.getElementById('skip-conflict-btn').addEventListener('click', () => {
     processNextConflict();
 });
+
+// ==================== AI 圖片記帳與設定功能 ====================
+
+function initSettingsAndAI() {
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const cancelSettingsBtn = document.getElementById('cancel-settings-btn');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    const clearSettingsBtn = document.getElementById('clear-settings-btn');
+    const geminiKeyInput = document.getElementById('gemini-key-input');
+
+    const aiUploadBtn = document.getElementById('ai-upload-btn');
+    const aiFileUpload = document.getElementById('ai-file-upload');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    // 預設將 API Key 寫入 input
+    const defaultApiKey = 'AIzaSyALUfYyDZwtxwTG8ffv-eSQrgh_f1ozULc';
+    let savedApiKey = localStorage.getItem('gemini_api_key');
+    if (!savedApiKey) {
+        localStorage.setItem('gemini_api_key', defaultApiKey);
+        savedApiKey = defaultApiKey;
+    }
+    geminiKeyInput.value = savedApiKey;
+
+    // 開啟設定彈窗
+    settingsBtn.addEventListener('click', () => {
+        geminiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+        settingsModal.classList.add('active');
+    });
+
+    // 關閉設定彈窗
+    cancelSettingsBtn.addEventListener('click', () => {
+        settingsModal.classList.remove('active');
+    });
+
+    // 儲存設定
+    saveSettingsBtn.addEventListener('click', () => {
+        const key = geminiKeyInput.value.trim();
+        if (key) {
+            localStorage.setItem('gemini_api_key', key);
+            alert("✅ Gemini API Key 已成功儲存在您的瀏覽器中！");
+        } else {
+            localStorage.removeItem('gemini_api_key');
+            alert("ℹ️ 已清除 API Key。");
+        }
+        settingsModal.classList.remove('active');
+    });
+
+    // 清除設定
+    clearSettingsBtn.addEventListener('click', () => {
+        localStorage.removeItem('gemini_api_key');
+        geminiKeyInput.value = '';
+        alert("🗑️ API Key 已清除！");
+        settingsModal.classList.remove('active');
+    });
+
+    // 點擊 AI 圖片記帳按鈕 -> 觸發隱藏的 file input
+    aiUploadBtn.addEventListener('click', () => {
+        const apiKey = localStorage.getItem('gemini_api_key');
+        if (!apiKey) {
+            alert("⚠️ 請先點擊齒輪圖示 ⚙️ 設定您的 Google Gemini API Key！");
+            settingsModal.classList.add('active');
+            return;
+        }
+        aiFileUpload.click();
+    });
+
+    // 處理上傳檔案
+    aiFileUpload.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        // 顯示 Loading 遮罩
+        loadingOverlay.classList.add('active');
+
+        try {
+            const allBankRecords = [];
+            const allEcommerceOrders = [];
+
+            // 依序處理每一張圖片
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                document.getElementById('loading-text').textContent = `🤖 AI 正在辨識您的圖片 (第 ${i + 1}/${files.length} 張)...`;
+                
+                const base64Data = await fileToBase64(file);
+                const mimeType = file.type;
+                
+                // 呼叫 Gemini 解析單張圖片
+                const result = await processSingleImageWithAI(base64Data, mimeType);
+                if (result) {
+                    if (result.type === 'bankRecords' && result.bankRecords) {
+                        allBankRecords.push(...result.bankRecords);
+                    } else if (result.type === 'ecommerceOrders' && result.ecommerceOrders) {
+                        allEcommerceOrders.push(...result.ecommerceOrders);
+                    }
+                }
+            }
+
+            // 重設 Loading 文字並隱藏
+            document.getElementById('loading-text').textContent = "🤖 AI 正在辨識您的圖片...";
+            loadingOverlay.classList.remove('active');
+
+            // 分流處理合併後的所有數據 (在此進行去重)
+            if (allBankRecords.length > 0) {
+                await handleParsedBankRecords(allBankRecords);
+            }
+            if (allEcommerceOrders.length > 0) {
+                await handleParsedEcommerceOrders(allEcommerceOrders);
+            }
+            if (allBankRecords.length === 0 && allEcommerceOrders.length === 0) {
+                alert("⚠️ 辨識完成，但未偵測到任何有效的扣款帳單或商品購物明細。");
+            }
+        } catch (err) {
+            console.error("AI 辨識錯誤", err);
+            document.getElementById('loading-text').textContent = "🤖 AI 正在辨識您的圖片...";
+            alert("AI 辨識失敗：" + err.message);
+            loadingOverlay.classList.remove('active');
+        } finally {
+            e.target.value = ''; // 清空選擇，防重複觸發
+        }
+    });
+}
+
+// 輔助函數：圖片檔案轉 Base64
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = evt => resolve(evt.target.result.split(',')[1]);
+        reader.onerror = err => reject(err);
+        reader.readAsDataURL(file);
+    });
+}
+
+// 呼叫 Gemini REST API 解析單張圖片
+async function processSingleImageWithAI(base64Data, mimeType) {
+    const apiKey = localStorage.getItem('gemini_api_key');
+    if (!apiKey) {
+        throw new Error("找不到 API Key，請先設定！");
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+    const promptText = `你是一個專業的家庭記帳與電商明細解析小幫手。
+請仔細辨識上傳的「信用卡/銀行帳單」截圖或是「電商平台（如蝦皮、酷澎、momo等）商品明細」截圖。
+
+請特別注意：
+1. 本次記帳系統所在的月份為 "${state.currentMonth}"。
+2. 日期格式請務必為 "YYYY-MM-DD"（例如 2026-05-12）。如果截圖中只有「月/日」如 "05/12"，請自動結合年份為 "2026-05-12"。
+3. 辨識完畢後，請根據內容判定類型，並依以下 Schema 輸出結構化 JSON：
+   - 如果是信用卡帳單或銀行扣款紀錄，將 type 設為 "bankRecords"，並填入 bankRecords 陣列。
+   - 如果是電商平台（蝦皮、酷澎、momo等）訂單商品細項，將 type 設為 "ecommerceOrders"，並填入 ecommerceOrders 陣列。
+
+回傳的 JSON 結構 Schema：
+{
+  "type": "bankRecords" 或 "ecommerceOrders",
+  "bankRecords": [
+    {
+      "bank": "銀行名稱，如：聯邦、中信",
+      "date": "YYYY-MM-DD 格式日期",
+      "details": "消費商店或扣款明細",
+      "amountTWD": 數值
+    }
+  ],
+  "ecommerceOrders": [
+    {
+      "id": "訂單編號/編號",
+      "platform": "電商平台名稱，如：蝦皮、酷澎、momo",
+      "date": "YYYY-MM-DD 格式日期",
+      "total": 總金額數值,
+      "items": [
+        {
+          "name": "商品名稱",
+          "price": 單價數值,
+          "qty": 數量數值
+        }
+      ]
+    }
+  ]
+}`;
+
+    const payload = {
+        contents: [
+            {
+                parts: [
+                    { text: promptText },
+                    {
+                        inlineData: {
+                            mimeType: mimeType,
+                            data: base64Data
+                        }
+                    }
+                ]
+            }
+        ],
+        generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: "OBJECT",
+                properties: {
+                    type: { type: "STRING" },
+                    bankRecords: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                bank: { type: "STRING" },
+                                date: { type: "STRING" },
+                                details: { type: "STRING" },
+                                amountTWD: { type: "INTEGER" }
+                            },
+                            required: ["bank", "date", "details", "amountTWD"]
+                        }
+                    },
+                    ecommerceOrders: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                id: { type: "STRING" },
+                                platform: { type: "STRING" },
+                                date: { type: "STRING" },
+                                total: { type: "INTEGER" },
+                                items: {
+                                    type: "ARRAY",
+                                    items: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            name: { type: "STRING" },
+                                            price: { type: "INTEGER" },
+                                            qty: { type: "INTEGER" }
+                                        },
+                                        required: ["name", "price", "qty"]
+                                    }
+                                }
+                            },
+                            required: ["id", "platform", "date", "total", "items"]
+                        }
+                    }
+                },
+                required: ["type"]
+            }
+        }
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errBody = await response.text();
+        throw new Error(`Gemini API 請求失敗：${response.status} - ${errBody}`);
+    }
+
+    const resData = await response.json();
+    const responseText = resData.candidates[0].content.parts[0].text;
+    return JSON.parse(responseText);
+}
+
+// 處理解析出來的銀行紀錄 (自我去重 + 與雲端已存在交易去重)
+async function handleParsedBankRecords(records) {
+    // 1. 去除多張截圖之間自我重疊的重複交易
+    const uniqueRecords = [];
+    records.forEach(rec => {
+        const isDup = uniqueRecords.some(r => r.date === rec.date && r.details === rec.details && r.amountTWD === rec.amountTWD);
+        if (!isDup) {
+            uniqueRecords.push(rec);
+        }
+    });
+
+    // 2. 去除與雲端（已在本地 state.bankRecords 載入中）重複的紀錄
+    const finalInsertPayload = [];
+    uniqueRecords.forEach(r => {
+        const isDupInDb = state.bankRecords.some(oldRec => 
+            oldRec.date === r.date && 
+            oldRec.details === r.details && 
+            oldRec.amountTWD === r.amountTWD
+        );
+        if (!isDupInDb) {
+            finalInsertPayload.push({
+                id: "m_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8),
+                month: state.currentMonth,
+                bank: r.bank,
+                date: r.date,
+                details: r.details,
+                amount_twd: r.amountTWD,
+                amount_foreign: null,
+                currency: 'TWD',
+                category: '未分類',
+                usage_type: '家用',
+                custom_summary: null,
+                matched_order: null
+            });
+        }
+    });
+
+    if (finalInsertPayload.length === 0) {
+        alert(`ℹ️ AI 辨識出 ${records.length} 筆交易紀錄。\n但經過系統比對，所有交易皆已存在於資料庫中，已為您自動過濾全部重複交易，未新增任何項目。`);
+        return;
+    }
+
+    const confirmImport = confirm(
+        `📸 AI 辨識成功！\n\n共辨識到 ${records.length} 筆交易。\n- 🆕 新交易：${finalInsertPayload.length} 筆\n- 🛡️ 已自動過濾重複：${records.length - finalInsertPayload.length} 筆\n\n請問您是否要將這 ${finalInsertPayload.length} 筆新交易寫入雲端資料庫？`
+    );
+    if (!confirmImport) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('transactions')
+            .upsert(finalInsertPayload, { onConflict: 'id' });
+
+        if (error) throw error;
+        alert(`✅ 成功同步匯入 ${finalInsertPayload.length} 筆帳單新交易至雲端！`);
+        await loadData();
+    } catch (err) {
+        console.error("寫入 Supabase 失敗：", err);
+        alert("同步寫入雲端失敗：" + err.message);
+    }
+}
+
+// 處理解析出來的電商紀錄 (自我去重 + 本地快取去重)
+async function handleParsedEcommerceOrders(orders) {
+    // 載入當前快取中的電商訂單
+    const savedOrdersStr = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
+    let currentOrders = savedOrdersStr ? JSON.parse(savedOrdersStr) : [];
+
+    let newCount = 0;
+    let dupCount = 0;
+
+    // 合併新解析出來的電商訂單 (以 ID 或 platform+date+total 去重)
+    orders.forEach(newOpt => {
+        const exists = currentOrders.some(oldOpt => 
+            oldOpt.id === newOpt.id || 
+            (oldOpt.platform === newOpt.platform && oldOpt.date === newOpt.date && oldOpt.total === newOpt.total)
+        );
+        if (!exists) {
+            currentOrders.push(newOpt);
+            newCount++;
+        } else {
+            dupCount++;
+        }
+    });
+
+    // 存回本地快取
+    localStorage.setItem('ecommerceOrders_' + state.currentMonth, JSON.stringify(currentOrders));
+    state.ecommerceOrders = currentOrders;
+    resetMatchButton();
+
+    // 執行自動比對
+    let matchCount = 0;
+    const targetRecords = state.bankRecords.filter(r => 
+        /蝦皮|酷澎|momo/i.test(r.details) && !r.matchedOrder
+    );
+
+    for (const record of targetRecords) {
+        const matchedOrders = state.ecommerceOrders.filter(o => o.total === record.amountTWD && !o.isMatched);
+        if (matchedOrders.length === 1) {
+            await matchRecordToOrder(record, matchedOrders[0]);
+            matchCount++;
+        }
+    }
+
+    alert(`✅ AI 辨識出 ${orders.length} 筆電商訂單。\n- 🆕 新載入：${newCount} 筆\n- 🛡️ 已自動過濾重複：${dupCount} 筆\n- 🔍 已為您自動比對並帶入項目：${matchCount} 筆交易！`);
+    await loadData();
+}
 
 // 啟動應用程式
 window.addEventListener('DOMContentLoaded', init);

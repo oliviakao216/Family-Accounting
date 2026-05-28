@@ -27,6 +27,14 @@
                 <button id="help-btn" class="secondary-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; background: #e2e8f0; color: #4a5568; border: none; cursor: pointer;" title="操作教學">
                     <span style="font-size: 1.2rem;">ⓘ</span>
                 </button>
+                <button id="settings-btn" class="secondary-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; background: #e2e8f0; color: #4a5568; border: none; cursor: pointer;" title="設定 Gemini API Key">
+                    <span style="font-size: 1.1rem;">⚙️</span>
+                </button>
+                <button id="ai-upload-btn" class="primary-btn" style="background-color: #319795; border-color: #2c7a7b; padding: 0.5rem 1rem; font-size: 0.9rem;">
+                    <span class="icon">📸</span> AI 圖片記帳
+                </button>
+                <input type="file" id="ai-file-upload" accept="image/*" style="display: none;" multiple>
+                
                 <div class="desktop-only-btns" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     <button id="import-btn" class="secondary-btn" style="background-color: #ecc94b; color: #744210;">
                         <span class="icon">📂</span> 匯入資料檔 (JSON)
@@ -57,9 +65,13 @@
                     <div class="summary-list" id="summary-list">
                         <!-- 分類小計會由 JS 動態生成 -->
                     </div>
-                    <div class="total-box" style="margin-bottom: 2rem;">
+                    <div class="total-box" style="margin-bottom: 1rem;">
                         <span>總支出</span>
                         <h3 id="grand-total">NT$ 0</h3>
+                    </div>
+                    <div class="total-box" style="margin-bottom: 2rem; margin-top: 0px; background: linear-gradient(135deg, #319795 0%, #2c7a7b 100%);">
+                        <span>🧾 有發票金額加總</span>
+                        <h3 id="household-invoice-total">NT$ 0</h3>
                     </div>
 
                     <h2>📈 家庭開支小計</h2>
@@ -82,7 +94,7 @@
             <main class="main-content">
                 <div class="main-header">
                     <div style="display: flex; align-items: center; gap: 1rem;">
-                        <h2>📝 帳務明細 (雲端資料庫)</h2>
+                        <h2>📝 <span id="year-label">2026</span> 年 <span id="month-label">5</span> 月帳務明細 (雲端資料庫)</h2>
                         <button id="add-manual-btn" class="primary-btn" style="padding: 0.3rem 0.8rem; font-size: 0.85rem; background: #ed8936; border-color: #dd6b20;">
                             ➕ 隨手記帳
                         </button>
@@ -98,7 +110,7 @@
                     <table class="transaction-table">
                         <thead>
                             <tr>
-                                <th>銀行</th>
+                                <th>信用卡/銀行</th>
                                 <th>日期</th>
                                 <th>消費明細</th>
                                 <th>分類 (可修改)</th>
@@ -204,6 +216,37 @@
             <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
                 <button id="close-help-btn" class="primary-btn">我瞭解了</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 設定視窗 (Modal) -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content" style="max-width: 450px; padding: 2rem;">
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">⚙️ 系統設定</h3>
+            
+            <label style="font-weight: bold; font-size: 0.9rem; display: block; margin-bottom: 0.5rem;">Google Gemini API Key</label>
+            <input type="password" id="gemini-key-input" class="summary-input" style="width: 100%; margin-bottom: 0.5rem; border: 1px solid #e2e8f0; padding: 0.5rem;" placeholder="請輸入您的 API Key...">
+            
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.4;">
+                💡 為了您的隱私，此 Key 只會安全儲存在您此台裝置的本地瀏覽器中，不會上傳至任何其他伺服器。
+                <br>
+                🔗 尚未擁有 Key？<a href="https://aistudio.google.com/apikey" target="_blank" style="color: #3182ce; font-weight: bold; text-decoration: underline;">點此免費申請 Gemini API Key</a>
+            </p>
+            
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button id="clear-settings-btn" class="primary-btn" style="background: #e53e3e; border-color: #c53030;">清除 Key</button>
+                <button id="cancel-settings-btn" class="primary-btn" style="background: #a0aec0; border-color: #718096;">取消</button>
+                <button id="save-settings-btn" class="primary-btn">儲存設定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 解析中 Loading 遮罩 -->
+    <div id="loading-overlay" class="modal" style="background: rgba(0, 0, 0, 0.7);">
+        <div style="background: white; padding: 2rem 3rem; border-radius: var(--radius-lg); text-align: center; max-width: 400px; margin: auto;">
+            <div class="spinner" style="margin: 0 auto 1.5rem; width: 50px; height: 50px; border: 5px solid #edf2f7; border-top: 5px solid #319795; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <h3 id="loading-text" style="color: #2c7a7b; margin-bottom: 0.5rem;">🤖 AI 正在辨識您的圖片...</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">這通常需要 3 ~ 8 秒，請保持網路連線並稍候。</p>
         </div>
     </div>
 
