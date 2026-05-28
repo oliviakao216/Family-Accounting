@@ -600,7 +600,16 @@ body {
         size: portrait; 
         margin: 1cm; 
     }
-    body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    
+    /* 徹底解決手機列印下 overflow 導致無法跨頁分頁、產生空白首頁的 Bug */
+    html, body, .app-container, .content-wrapper, .main-content, .table-container {
+        overflow: visible !important;
+        height: auto !important;
+        max-height: none !important;
+        background: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
     
     /* 隱藏所有按鈕、頁籤、設定按鈕、手機版收合按鈕 */
     button, .primary-btn, .secondary-btn, .tabs, .delete-btn, .edit-btn, #help-btn, #settings-btn, #mobile-sidebar-toggle { 
@@ -616,13 +625,44 @@ body {
     .content-wrapper { 
         display: block !important; 
     }
+    
+    /* 強制在列印時展開統計小計內容，否則在手機版列印時會因收合而完全空白 */
+    #sidebar-content {
+        display: block !important;
+    }
+    
     .sidebar { 
         width: 100% !important;
-        margin-bottom: 2rem !important; 
+        margin-bottom: 1rem !important; 
+        padding: 0.75rem !important;
         box-shadow: none !important; 
         border: 2px solid #e2e8f0 !important; 
         page-break-inside: avoid; 
     }
+    
+    /* 縮小列印時的統計卡片高度與邊距，防止佔用過多第一頁版面 */
+    .sidebar h2 {
+        font-size: 1.1rem !important;
+        margin-bottom: 0.5rem !important;
+        padding-bottom: 0.25rem !important;
+    }
+    .summary-list {
+        gap: 0.4rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    .summary-item {
+        padding: 0.4rem 0.6rem !important;
+    }
+    .total-box {
+        padding: 0.75rem !important;
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    .total-box h3 {
+        font-size: 1.3rem !important;
+        margin-top: 0.25rem !important;
+    }
+    
     .main-content { 
         width: 100% !important;
         box-shadow: none !important; 
