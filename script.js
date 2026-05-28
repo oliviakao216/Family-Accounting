@@ -39,6 +39,7 @@ const monthSelector = document.getElementById('month-selector');
 const runMatchBtn = document.getElementById('run-match-btn');
 const modal = document.getElementById('conflict-modal');
 const optionsContainer = document.getElementById('conflict-options');
+const printBtn = document.getElementById('print-btn');
 
 // 切換月份
 monthSelector.addEventListener('change', (e) => {
@@ -693,6 +694,40 @@ document.getElementById('help-btn').addEventListener('click', () => {
 });
 document.getElementById('close-help-btn').addEventListener('click', () => {
     helpModal.classList.remove('active');
+});
+
+// 匯出 PDF (強制只匯出家用資料)
+printBtn.addEventListener('click', () => {
+    // 記住原本所在的頁籤與標題
+    const prevTab = state.currentTab;
+    const originalTitle = document.title;
+    
+    // 強制更改標題 (瀏覽器會用這個當作 PDF 的預設檔名)
+    if (state.currentMonth) {
+        document.title = `家庭帳務整理${state.currentMonth}`;
+    }
+
+    // 強制切換到「家用」
+    state.currentTab = '家用';
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-tab') === '家用');
+    });
+    renderTable();
+    updateSummary();
+    
+    // 延遲一點確保畫面渲染完成再打開列印視窗
+    setTimeout(() => {
+        window.print();
+        
+        // 列印結束後自動恢復原本的頁籤與標題
+        document.title = originalTitle;
+        state.currentTab = prevTab;
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.toggle('active', b.getAttribute('data-tab') === prevTab);
+        });
+        renderTable();
+        updateSummary();
+    }, 150);
 });
 
 // ==================== 自動比對與衝突處理 ====================
