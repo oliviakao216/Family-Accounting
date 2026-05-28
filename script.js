@@ -338,8 +338,8 @@ function renderTable() {
             countHtml = `<span class="item-count" style="font-size:0.75rem; background:#ebf8ff; color:#2b6cb0; padding:2px 6px; border-radius:4px; margin-right:4px; white-space:nowrap;">共 ${count} 項</span>`;
         }
 
-        const hasInvoice = (record.customSummary && record.customSummary.includes(' [發票]'));
-        const displaySummary = summaryText.replace(' [發票]', '');
+        const hasInvoice = (record.customSummary && (record.customSummary.includes(' [發票]') || record.customSummary.includes(' [宗親會]')));
+        const displaySummary = summaryText.replace(' [發票]', '').replace(' [宗親會]', '');
 
         const itemTd = `
             <td>
@@ -415,14 +415,14 @@ function renderTable() {
             const record = state.bankRecords.find(r => r.id === id);
             if (!record) return;
 
-            const isChecked = (record.customSummary && record.customSummary.includes(' [發票]'));
+            const isChecked = (record.customSummary && (record.customSummary.includes(' [發票]') || record.customSummary.includes(' [宗親會]')));
             let newText = e.target.value.trim();
             
             // 避免重複附加
-            newText = newText.replace(' [發票]', '');
+            newText = newText.replace(' [發票]', '').replace(' [宗親會]', '');
             
             if (isChecked) {
-                newText += ' [發票]';
+                newText += ' [宗親會]';
             }
             
             updateRecordInDb(id, { customSummary: newText });
@@ -440,11 +440,12 @@ function renderTable() {
             const isChecked = e.target.checked;
 
             if (isChecked) {
-                if (!currentSummary.includes(' [發票]')) {
-                    currentSummary = currentSummary ? `${currentSummary} [發票]` : ' [發票]';
+                if (!currentSummary.includes(' [宗親會]')) {
+                    currentSummary = currentSummary.replace(' [發票]', '');
+                    currentSummary = currentSummary ? `${currentSummary} [宗親會]` : ' [宗親會]';
                 }
             } else {
-                currentSummary = currentSummary.replace(' [發票]', '');
+                currentSummary = currentSummary.replace(' [發票]', '').replace(' [宗親會]', '');
             }
 
             // 同步至 Supabase 雲端
@@ -454,7 +455,7 @@ function renderTable() {
             const row = e.target.closest('tr');
             const input = row.querySelector('.summary-input');
             if (input) {
-                input.value = currentSummary.replace(' [發票]', '');
+                input.value = currentSummary.replace(' [發票]', '').replace(' [宗親會]', '');
                 input.classList.toggle('empty', !input.value);
             }
         });
@@ -510,7 +511,7 @@ function updateSummary() {
             if (r.usageType === '家用') {
                 summary[r.category] += amt;
                 grandTotal += amt;
-                if (r.customSummary && r.customSummary.includes(' [發票]')) {
+                if (r.customSummary && (r.customSummary.includes(' [發票]') || r.customSummary.includes(' [宗親會]'))) {
                     householdInvoiceTotal += amt;
                 }
             } else if (r.usageType === '家庭開支') {
