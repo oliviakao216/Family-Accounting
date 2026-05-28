@@ -595,21 +595,42 @@ body {
 
 /* 列印 / 匯出 PDF 專屬報表排版 */
 @media print {
-    /* 強制橫向列印，確保右側金額不會被切掉 */
+    /* 設定為直式列印，並留出適當邊距 */
     @page { 
-        size: landscape; 
+        size: portrait; 
         margin: 1cm; 
     }
     body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    /* 隱藏所有按鈕與頁籤 */
-    .primary-btn, .tabs, .delete-btn { display: none !important; }
-    /* 隱藏表格最後一欄的「操作」 */
-    th:last-child, td:last-child { display: none !important; }
-    /* 將左右並排改為上下排列，讓 PDF 更好閱讀 */
-    .content-wrapper { display: block !important; }
-    .sidebar { margin-bottom: 2rem !important; box-shadow: none !important; border: 2px solid #e2e8f0 !important; page-break-inside: avoid; }
-    .main-content { box-shadow: none !important; border: none !important; padding: 0 !important; }
-    /* 讓下拉選單和輸入框看起來像純文字，並允許換行 */
+    
+    /* 隱藏所有按鈕、頁籤、設定按鈕、手機版收合按鈕 */
+    button, .primary-btn, .secondary-btn, .tabs, .delete-btn, .edit-btn, #help-btn, #settings-btn, #mobile-sidebar-toggle { 
+        display: none !important; 
+    }
+    
+    /* 隱藏表格最後一欄的「操作」欄位 */
+    th:last-child, td:last-child { 
+        display: none !important; 
+    }
+    
+    /* 將左右並排改為上下排列，並寬度滿版，讓 PDF 在直式下更好閱讀 */
+    .content-wrapper { 
+        display: block !important; 
+    }
+    .sidebar { 
+        width: 100% !important;
+        margin-bottom: 2rem !important; 
+        box-shadow: none !important; 
+        border: 2px solid #e2e8f0 !important; 
+        page-break-inside: avoid; 
+    }
+    .main-content { 
+        width: 100% !important;
+        box-shadow: none !important; 
+        border: none !important; 
+        padding: 0 !important; 
+    }
+    
+    /* 讓下拉選單和輸入框看起來像純文字，並允許換行，不要死撐寬度 */
     select, input { 
         border: none !important; 
         background: transparent !important; 
@@ -618,20 +639,25 @@ body {
         color: black !important; 
         padding: 0 !important; 
         font-weight: 500;
-        width: auto !important;
-        max-width: 150px;
-        white-space: normal;
+        width: 100% !important;
+        max-width: none !important;
+        white-space: normal !important;
     }
-    /* 縮小表格字體與間距，讓每一列塞得進版面 */
+    
+    /* 縮小表格字體與間距，並解除手機版的最小寬度限制，以完全塞進直式 A4 中 */
     .transaction-table { 
+        min-width: auto !important;
+        width: 100% !important;
         font-size: 11px !important; 
         page-break-inside: auto; 
     }
     .transaction-table th, .transaction-table td {
         padding: 6px 4px !important;
+        white-space: normal !important; /* 允許內容換行，防止撐寬 */
     }
     .amount {
-        font-size: 12px !important;
+        font-size: 11px !important;
+        font-family: monospace;
     }
     tr { page-break-inside: avoid; page-break-after: auto; }
 }
