@@ -700,6 +700,11 @@ body {
         font-family: monospace;
     }
     tr { page-break-inside: avoid; page-break-after: auto; }
+    
+    /* 讓使用者可以選擇隱藏特定的列印區塊 */
+    .print-hidden {
+        display: none !important;
+    }
 }
 
 @keyframes spin {

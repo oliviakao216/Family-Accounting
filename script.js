@@ -696,8 +696,42 @@ document.getElementById('close-help-btn').addEventListener('click', () => {
     helpModal.classList.remove('active');
 });
 
-// 匯出 PDF (強制只匯出家用資料)
+// 匯出 PDF (先彈出選項讓使用者選擇要匯出哪些小計與總額)
 printBtn.addEventListener('click', () => {
+    const pdfModal = document.getElementById('pdf-export-modal');
+    pdfModal.classList.add('active');
+});
+
+// 取消 PDF 匯出
+document.getElementById('cancel-pdf-btn').addEventListener('click', () => {
+    document.getElementById('pdf-export-modal').classList.remove('active');
+});
+
+// 確認 PDF 匯出並列印
+document.getElementById('confirm-pdf-btn').addEventListener('click', () => {
+    // 關閉 Modal
+    document.getElementById('pdf-export-modal').classList.remove('active');
+
+    // 讀取勾選狀態
+    const showHousehold = document.getElementById('pdf-opt-household').checked;
+    const showFamily = document.getElementById('pdf-opt-family').checked;
+    const showCombined = document.getElementById('pdf-opt-combined').checked;
+
+    // 動態加上或移除 print-hidden class
+    const secHousehold = document.getElementById('print-section-household');
+    const secFamily = document.getElementById('print-section-family');
+    const secCombined = document.getElementById('print-section-combined');
+
+    if (secHousehold) {
+        secHousehold.classList.toggle('print-hidden', !showHousehold);
+    }
+    if (secFamily) {
+        secFamily.classList.toggle('print-hidden', !showFamily);
+    }
+    if (secCombined) {
+        secCombined.classList.toggle('print-hidden', !showCombined);
+    }
+
     // 記住原本所在的頁籤與標題
     const prevTab = state.currentTab;
     const originalTitle = document.title;
@@ -719,12 +753,17 @@ printBtn.addEventListener('click', () => {
     setTimeout(() => {
         window.print();
         
-        // 列印結束後自動恢復原本的頁籤與標題
+        // 列印結束後自動恢復原本的頁籤、標題，並移除列印隱藏標籤
         document.title = originalTitle;
         state.currentTab = prevTab;
         document.querySelectorAll('.tab-btn').forEach(b => {
             b.classList.toggle('active', b.getAttribute('data-tab') === prevTab);
         });
+        
+        if (secHousehold) secHousehold.classList.remove('print-hidden');
+        if (secFamily) secFamily.classList.remove('print-hidden');
+        if (secCombined) secCombined.classList.remove('print-hidden');
+
         renderTable();
         updateSummary();
     }, 150);
