@@ -23,7 +23,7 @@ let state = {
     ecommerceOrders: [],
     conflicts: [], // 需要手動選擇的衝突清單
     currentConflict: null,
-    currentMonth: document.getElementById('month-selector').value,
+    currentMonth: "", // 將在 initMonthSelector 初始化
     currentTab: 'all',
     editingId: null
 };
@@ -36,6 +36,7 @@ const addManualBtn = document.getElementById('add-manual-btn');
 const importBtn = document.getElementById('import-btn');
 const fileUpload = document.getElementById('file-upload');
 const monthSelector = document.getElementById('month-selector');
+const manualMonthSelector = document.getElementById('manual-month');
 const runMatchBtn = document.getElementById('run-match-btn');
 const modal = document.getElementById('conflict-modal');
 const optionsContainer = document.getElementById('conflict-options');
@@ -44,12 +45,76 @@ const printBtn = document.getElementById('print-btn');
 // 切換月份
 monthSelector.addEventListener('change', (e) => {
     state.currentMonth = e.target.value;
+    localStorage.setItem('lastSelectedMonth', state.currentMonth);
     const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
     state.ecommerceOrders = savedOrders ? JSON.parse(savedOrders) : [];
     // 重設比對按鈕狀態
     resetMatchButton();
     loadData();
 });
+
+// 初始化月份選擇器（從資料庫載入所有已存在交易的月份，並補上預設月份）
+async function initMonthSelector() {
+    try {
+        // 從 Supabase 取得所有交易的月份
+        const { data, error } = await supabaseClient
+            .from('transactions')
+            .select('month');
+            
+        if (error) throw error;
+        
+        // 取得所有 unique 的月份
+        const monthsSet = new Set();
+        if (data) {
+            data.forEach(r => {
+                if (r.month && r.month.length === 6) {
+                    monthsSet.add(r.month);
+                }
+            });
+        }
+        
+        // 額外加上一些預設月份與當前月份，以防資料庫是空的
+        monthsSet.add("202604");
+        monthsSet.add("202605");
+        monthsSet.add("202606");
+        
+        const today = new Date();
+        const thisMonthStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}`;
+        monthsSet.add(thisMonthStr);
+        
+        // 轉成陣列並排序 (由舊到新)
+        const sortedMonths = Array.from(monthsSet).sort();
+        
+        // 記住目前的選擇值，預設為今天的月份或 202605
+        let currentSelected = localStorage.getItem('lastSelectedMonth');
+        if (!currentSelected) {
+            currentSelected = monthsSet.has(thisMonthStr) ? thisMonthStr : "202605";
+        }
+        
+        // 如果 currentSelected 不在 sortedMonths 中，也把它加進去
+        if (!sortedMonths.includes(currentSelected)) {
+            sortedMonths.push(currentSelected);
+            sortedMonths.sort();
+        }
+        
+        // 渲染選單
+        const optionsHtml = sortedMonths.map(m => {
+            const y = m.substring(0, 4);
+            const mon = m.substring(4, 6);
+            return `<option value="${m}">${y} 年 ${mon} 月</option>`;
+        }).join('');
+        
+        monthSelector.innerHTML = optionsHtml;
+        
+        // 設定選取的值
+        monthSelector.value = currentSelected;
+        state.currentMonth = currentSelected;
+        
+    } catch (e) {
+        console.error("載入月份失敗，使用預設選單", e);
+        state.currentMonth = "202605";
+    }
+}
 
 // 重設比對按鈕
 function resetMatchButton() {
@@ -73,6 +138,9 @@ async function init() {
             updateSummary();
         });
     });
+
+    // 初始化月份選擇器
+    await initMonthSelector();
 
     // 取得當天日期自動填入手動新增表單
     const today = new Date();
@@ -275,6 +343,7 @@ async function updateRecordInDb(id, updates) {
     if (updates.details !== undefined) dbUpdates.details = updates.details;
     if (updates.amountTWD !== undefined) dbUpdates.amount_twd = updates.amountTWD;
     if (updates.matchedOrder !== undefined) dbUpdates.matched_order = updates.matchedOrder;
+    if (updates.month !== undefined) dbUpdates.month = updates.month;
     
     await supabaseClient.from('transactions').update(dbUpdates).eq('id', id);
 }
@@ -368,10 +437,9 @@ function renderTable() {
         const twdTd = `<td class="text-right amount ${record.amountTWD < 0 ? 'negative' : ''}">${record.amountTWD}</td>`;
         const forTd = `<td class="text-right">${record.amountForeign ? record.amountForeign + ' ' + record.currency : '-'}</td>`;
 
-        const isManual = record.bank === "手帳" || record.id.startsWith("m_");
         const actionTd = `
             <td style="text-align: center; white-space: nowrap;">
-                ${isManual ? `<button class="edit-btn secondary-btn" data-id="${record.id}" title="修改此紀錄" style="padding:0.2rem; font-size:0.8rem; margin-right:4px;">✏️</button>` : ''}
+                <button class="edit-btn secondary-btn" data-id="${record.id}" title="修改此紀錄" style="padding:0.2rem; font-size:0.8rem; margin-right:4px;">✏️</button>
                 <button class="delete-btn" data-id="${record.id}" title="刪除此紀錄">🗑️</button>
             </td>
         `;
@@ -473,6 +541,10 @@ function renderTable() {
             
             const catSelect = document.getElementById('manual-cat');
             catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            // 動態設定記帳月份選項
+            manualMonthSelector.innerHTML = monthSelector.innerHTML;
+            manualMonthSelector.value = record.month || state.currentMonth;
             
             document.getElementById('manual-date').value = record.date;
             document.getElementById('manual-details').value = record.details;
@@ -592,6 +664,11 @@ addManualBtn.addEventListener('click', () => {
     
     const catSelect = document.getElementById('manual-cat');
     catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+    
+    // 動態設定記帳月份選項
+    manualMonthSelector.innerHTML = monthSelector.innerHTML;
+    manualMonthSelector.value = state.currentMonth;
+    
     document.getElementById('manual-details').value = "";
     document.getElementById('manual-amount').value = "";
     document.getElementById('manual-usage').value = "家用";
@@ -616,6 +693,7 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
     const amountStr = document.getElementById('manual-amount').value.trim();
     const cat = document.getElementById('manual-cat').value;
     const usage = document.getElementById('manual-usage').value;
+    const selectedMonth = document.getElementById('manual-month').value;
     
     let amountTWD = NaN;
     if (amountStr) {
@@ -625,7 +703,7 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
         } catch (e) { amountTWD = NaN; }
     }
     
-    if (!date || !details || isNaN(amountTWD)) {
+    if (!date || !details || isNaN(amountTWD) || !selectedMonth) {
         alert("請確認所有欄位，且金額請輸入有效的數字或算式！");
         return;
     }
@@ -643,15 +721,36 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
                 details: details,
                 amountTWD: amountTWD,
                 category: cat,
-                usageType: usage
+                usageType: usage,
+                month: selectedMonth
             });
-            renderTable();
+
+            // 若修改後的月份與當前畫面月份不同，從當前畫面移除這筆資料
+            if (selectedMonth !== state.currentMonth) {
+                state.bankRecords = state.bankRecords.filter(r => r.id !== state.editingId);
+                renderTable();
+                updateSummary();
+                
+                const y = selectedMonth.substring(0, 4);
+                const mon = parseInt(selectedMonth.substring(4, 6), 10);
+                if (confirm(`✅ 修改成功！\n此筆帳務已被移至 ${y} 年 ${mon} 月。\n\n是否要切換到該月份查看？`)) {
+                    state.currentMonth = selectedMonth;
+                    monthSelector.value = selectedMonth;
+                    localStorage.setItem('lastSelectedMonth', state.currentMonth);
+                    const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
+                    state.ecommerceOrders = savedOrders ? JSON.parse(savedOrders) : [];
+                    resetMatchButton();
+                    await loadData();
+                }
+            } else {
+                renderTable();
+            }
             manualModal.classList.remove('active');
         } else {
             // 新增紀錄
             const newRecord = {
                 id: "m_" + Date.now(),
-                month: state.currentMonth,
+                month: selectedMonth,
                 bank: "手帳",
                 date: date,
                 details: details,
@@ -665,18 +764,34 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
             const { error } = await supabaseClient.from('transactions').insert([newRecord]);
             if (error) throw error;
             
-            // 更新畫面
-            state.bankRecords.unshift({
-                id: newRecord.id, month: newRecord.month, bank: newRecord.bank,
-                date: newRecord.date, details: newRecord.details, amountTWD: newRecord.amount_twd,
-                amountForeign: newRecord.amount_foreign, currency: newRecord.currency,
-                category: newRecord.category, usageType: newRecord.usage_type
-            });
-            
-            autoCategorizeBase();
-            renderTable();
-            updateSummary();
-            manualModal.classList.remove('active');
+            // 更新畫面 (如果新增的月份與當前月份相同)
+            if (selectedMonth === state.currentMonth) {
+                state.bankRecords.unshift({
+                    id: newRecord.id, month: newRecord.month, bank: newRecord.bank,
+                    date: newRecord.date, details: newRecord.details, amountTWD: newRecord.amount_twd,
+                    amountForeign: newRecord.amount_foreign, currency: newRecord.currency,
+                    category: newRecord.category, usageType: newRecord.usage_type
+                });
+                
+                autoCategorizeBase();
+                renderTable();
+                updateSummary();
+                manualModal.classList.remove('active');
+            } else {
+                manualModal.classList.remove('active');
+                
+                const y = selectedMonth.substring(0, 4);
+                const mon = parseInt(selectedMonth.substring(4, 6), 10);
+                if (confirm(`✅ 儲存成功！\n此筆帳務已歸檔至 ${y} 年 ${mon} 月。\n\n是否要切換到該月份查看？`)) {
+                    state.currentMonth = selectedMonth;
+                    monthSelector.value = selectedMonth;
+                    localStorage.setItem('lastSelectedMonth', state.currentMonth);
+                    const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
+                    state.ecommerceOrders = savedOrders ? JSON.parse(savedOrders) : [];
+                    resetMatchButton();
+                    await loadData();
+                }
+            }
         }
     } catch (error) {
         console.error("儲存失敗", error);
