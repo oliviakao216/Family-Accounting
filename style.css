@@ -277,6 +277,31 @@ body {
     background: var(--card-bg);
 }
 
+.transaction-table th.sortable {
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.transaction-table th.sortable:hover {
+    background-color: #edf2f7;
+    color: var(--text-primary);
+}
+
+.transaction-table th.sortable.active-sort {
+    color: var(--primary-color);
+}
+
+.sort-icon {
+    display: inline-block;
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+    color: #a0aec0;
+    transition: color 0.2s;
+}
+
+.transaction-table th.sortable.active-sort .sort-icon {
+    color: var(--primary-color);
+}
+
 .transaction-table td {
     padding: 1rem;
     border-bottom: 1px solid var(--border-color);
@@ -710,4 +735,38 @@ body {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* 年度報表專屬樣式 */
+#report-view {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    animation: fadeIn 0.3s ease;
+}
+
+#report-view .header {
+    margin-bottom: 1.5rem;
+}
+
+#report-table th, #report-table td {
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    text-align: center;
+    vertical-align: middle;
+}
+
+#report-table th {
+    background: #edf2f7;
+    color: var(--text-primary);
+    font-weight: 700;
+    border-bottom: 2px solid #cbd5e0;
+}
+
+#report-table td {
+    border-bottom: 1px solid var(--border-color);
+}
+
+#report-table tbody tr:hover {
+    background-color: #f7fafc;
 }

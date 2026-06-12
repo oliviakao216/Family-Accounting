@@ -25,7 +25,11 @@ let state = {
     currentConflict: null,
     currentMonth: "", // 將在 initMonthSelector 初始化
     currentTab: 'all',
-    editingId: null
+    editingId: null,
+    sortField: 'date', // 預設排序為日期
+    sortOrder: 'desc', // 預設為降序
+    isPrinting: false, // 是否正在列印中
+    excludePrivate: false // 是否排除私用資料
 };
 
 // DOM 元素
@@ -41,6 +45,13 @@ const runMatchBtn = document.getElementById('run-match-btn');
 const modal = document.getElementById('conflict-modal');
 const optionsContainer = document.getElementById('conflict-options');
 const printBtn = document.getElementById('print-btn');
+const prevMonthBtn = document.getElementById('prev-month-btn');
+const nextMonthBtn = document.getElementById('next-month-btn');
+const showReportBtn = document.getElementById('show-report-btn');
+const backToMainBtn = document.getElementById('back-to-main-btn');
+const prevYearBtn = document.getElementById('prev-year-btn');
+const nextYearBtn = document.getElementById('next-year-btn');
+const reportYearLabel = document.getElementById('report-year-label');
 
 // 切換月份
 monthSelector.addEventListener('change', (e) => {
@@ -51,6 +62,34 @@ monthSelector.addEventListener('change', (e) => {
     // 重設比對按鈕狀態
     resetMatchButton();
     loadData();
+    updateMonthNavButtons(); // 更新左右切換按鈕狀態
+});
+
+// 上一個月按鈕點擊
+if (prevMonthBtn) {
+    prevMonthBtn.addEventListener('click', () => {
+        if (monthSelector.selectedIndex > 0) {
+            monthSelector.selectedIndex -= 1;
+            monthSelector.dispatchEvent(new Event('change'));
+        }
+    });
+}
+
+// 下一個月按鈕點擊
+if (nextMonthBtn) {
+    nextMonthBtn.addEventListener('click', () => {
+        if (monthSelector.selectedIndex < monthSelector.options.length - 1) {
+            monthSelector.selectedIndex += 1;
+            monthSelector.dispatchEvent(new Event('change'));
+        }
+    });
+}
+
+// 手動新增視窗中的月份切換事件
+manualMonthSelector.addEventListener('change', (e) => {
+    if (!state.editingId) {
+        updateManualDateByDefault(e.target.value);
+    }
 });
 
 // 初始化月份選擇器（從資料庫載入所有已存在交易的月份，並補上預設月份）
@@ -77,6 +116,14 @@ async function initMonthSelector() {
         monthsSet.add("202604");
         monthsSet.add("202605");
         monthsSet.add("202606");
+        
+        // 補上 2025/01 - 2026/03 的回溯月份
+        for (let m = 1; m <= 12; m++) {
+            monthsSet.add(`2025${String(m).padStart(2, '0')}`);
+        }
+        for (let m = 1; m <= 3; m++) {
+            monthsSet.add(`2026${String(m).padStart(2, '0')}`);
+        }
         
         const today = new Date();
         const thisMonthStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -109,11 +156,45 @@ async function initMonthSelector() {
         // 設定選取的值
         monthSelector.value = currentSelected;
         state.currentMonth = currentSelected;
+        updateMonthNavButtons(); // 初始化月份後更新按鈕狀態
         
     } catch (e) {
         console.error("載入月份失敗，使用預設選單", e);
         state.currentMonth = "202605";
     }
+}
+
+// 根據所選月份，設定手動新增視窗 of 預設日期
+function updateManualDateByDefault(targetMonth) {
+    const today = new Date();
+    const thisMonthStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}`;
+    
+    if (targetMonth === thisMonthStr) {
+        // 如果是最新一期（當前月份），預設為今天
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        document.getElementById('manual-date').value = `${yyyy}-${mm}-${dd}`;
+    } else {
+        // 否則預設為該月 1 號
+        const yyyy = targetMonth.substring(0, 4);
+        const mm = targetMonth.substring(4, 6);
+        document.getElementById('manual-date').value = `${yyyy}-${mm}-01`;
+    }
+}
+
+// 更新月份導覽按鈕 (左右◀▶) 的啟用與停用狀態
+function updateMonthNavButtons() {
+    if (!monthSelector || !prevMonthBtn || !nextMonthBtn) return;
+    const idx = monthSelector.selectedIndex;
+    prevMonthBtn.disabled = (idx <= 0);
+    nextMonthBtn.disabled = (idx >= monthSelector.options.length - 1);
+    
+    // 調整外觀以配合停用狀態
+    prevMonthBtn.style.opacity = prevMonthBtn.disabled ? "0.4" : "1";
+    prevMonthBtn.style.cursor = prevMonthBtn.disabled ? "not-allowed" : "pointer";
+    nextMonthBtn.style.opacity = nextMonthBtn.disabled ? "0.4" : "1";
+    nextMonthBtn.style.cursor = nextMonthBtn.disabled ? "not-allowed" : "pointer";
 }
 
 // 重設比對按鈕
@@ -142,12 +223,8 @@ async function init() {
     // 初始化月份選擇器
     await initMonthSelector();
 
-    // 取得當天日期自動填入手動新增表單
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    document.getElementById('manual-date').value = `${yyyy}-${mm}-${dd}`;
+    // 初始化手動新增表單的預設日期
+    updateManualDateByDefault(state.currentMonth);
 
     // 嘗試載入當前月份已快取的電商訂單
     const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
@@ -157,6 +234,25 @@ async function init() {
 
     // 初始化金鑰設定與 AI 解析
     initSettingsAndAI();
+    
+    // 初始化年度報表事件
+    initReportView();
+
+    // 綁定表頭排序點擊事件
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const field = th.getAttribute('data-sort');
+            if (state.sortField === field) {
+                // 如果點選同一個欄位，切換升降序
+                state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                // 點選新欄位，設定為該欄位並設定預設排序方向 (日期與台幣金額為降序，其餘為升序)
+                state.sortField = field;
+                state.sortOrder = (field === 'date' || field === 'amountTWD') ? 'desc' : 'asc';
+            }
+            renderTable();
+        });
+    });
 
     await loadData();
 }
@@ -265,7 +361,7 @@ fileUpload.addEventListener('change', (e) => {
                         amount_foreign: r.amountForeign || null,
                         currency: r.currency || 'TWD',
                         category: r.category || '未分類',
-                        usage_type: r.usageType || '家用',
+                        usage_type: r.usageType || '瑗家用墊款',
                         custom_summary: r.customSummary || null,
                         matched_order: r.matchedOrder || null
                     }));
@@ -304,7 +400,7 @@ fileUpload.addEventListener('change', (e) => {
 function autoCategorizeBase() {
     let hasChanged = false;
     state.bankRecords.forEach(record => {
-        if (!record.usageType) record.usageType = "家用";
+        if (!record.usageType) record.usageType = "瑗家用墊款";
         
         if (record.category && record.category !== "未分類") return; 
         const detail = record.details;
@@ -373,9 +469,62 @@ function renderTable() {
         if (monthLabel) monthLabel.textContent = month;
     }
     
-    const filteredRecords = state.bankRecords.filter(record => 
-        state.currentTab === 'all' || record.usageType === state.currentTab
-    );
+    let filteredRecords = state.bankRecords.filter(record => {
+        // 基本過濾 (按頁籤)
+        const matchTab = state.currentTab === 'all' || record.usageType === state.currentTab;
+        
+        // 如果是在列印中，且勾選了排除私用，則強制排除歸屬為「私用」的明細
+        if (state.isPrinting && state.excludePrivate && record.usageType === '私用') {
+            return false;
+        }
+        return matchTab;
+    });
+    
+    // 依據所選欄位與排序方向對資料進行排序
+    filteredRecords.sort((a, b) => {
+        let valA, valB;
+        
+        switch (state.sortField) {
+            case 'date':
+                valA = a.date || '';
+                valB = b.date || '';
+                break;
+            case 'details':
+                valA = a.details || '';
+                valB = b.details || '';
+                break;
+            case 'category':
+                valA = a.category || '';
+                valB = b.category || '';
+                break;
+            case 'clan':
+                // 宗親會排序 (有勾選為 1，無勾選為 0)
+                valA = (a.customSummary && (a.customSummary.includes(' [發票]') || a.customSummary.includes(' [宗親會]'))) ? 1 : 0;
+                valB = (b.customSummary && (b.customSummary.includes(' [發票]') || b.customSummary.includes(' [宗親會]'))) ? 1 : 0;
+                break;
+            case 'usageType':
+                valA = a.usageType || '';
+                valB = b.usageType || '';
+                break;
+            case 'amountTWD':
+                valA = parseFloat(a.amountTWD) || 0;
+                valB = parseFloat(b.amountTWD) || 0;
+                break;
+            default:
+                valA = a.date || '';
+                valB = b.date || '';
+        }
+        
+        // 字串比較使用中文 localeCompare (適用注音)，數值或布林直接比較
+        let compareResult = 0;
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            compareResult = valA.localeCompare(valB, 'zh-TW');
+        } else {
+            compareResult = valA < valB ? -1 : (valA > valB ? 1 : 0);
+        }
+        
+        return state.sortOrder === 'asc' ? compareResult : -compareResult;
+    });
     
     filteredRecords.forEach(record => {
         const tr = document.createElement('tr');
@@ -429,7 +578,7 @@ function renderTable() {
             </td>
         `;
 
-        let usageOptions = ["家用", "私用", "家庭開支"].map(u => 
+        let usageOptions = ["瑗家用墊款", "私用", "綉家庭開支"].map(u => 
             `<option value="${u}" ${record.usageType === u ? 'selected' : ''}>${u}</option>`
         ).join('');
         const usageTd = `<td><select class="usage-select" data-id="${record.id}">${usageOptions}</select></td>`;
@@ -566,6 +715,21 @@ function renderTable() {
             }
         });
     });
+
+    // 更新表頭的排序視覺提示 (箭頭)
+    document.querySelectorAll('.sortable').forEach(th => {
+        const field = th.getAttribute('data-sort');
+        const icon = th.querySelector('.sort-icon');
+        if (!icon) return;
+        
+        if (field === state.sortField) {
+            th.classList.add('active-sort');
+            icon.textContent = state.sortOrder === 'asc' ? ' ▲' : ' ▼';
+        } else {
+            th.classList.remove('active-sort');
+            icon.textContent = ' ↕';
+        }
+    });
 }
 
 // 更新小計
@@ -581,13 +745,13 @@ function updateSummary() {
     state.bankRecords.forEach(r => {
         const amt = parseFloat(r.amountTWD);
         if (!isNaN(amt) && amt !== 0) {
-            if (r.usageType === '家用') {
+            if (r.usageType === '瑗家用墊款') {
                 summary[r.category] += amt;
                 grandTotal += amt;
                 if (r.customSummary && (r.customSummary.includes(' [發票]') || r.customSummary.includes(' [宗親會]'))) {
                     householdInvoiceTotal += amt;
                 }
-            } else if (r.usageType === '家庭開支') {
+            } else if (r.usageType === '綉家庭開支') {
                 familySummary[r.category] += amt;
                 familyGrandTotal += amt;
             }
@@ -671,13 +835,10 @@ addManualBtn.addEventListener('click', () => {
     
     document.getElementById('manual-details').value = "";
     document.getElementById('manual-amount').value = "";
-    document.getElementById('manual-usage').value = "家用";
+    document.getElementById('manual-usage').value = "瑗家用墊款";
     
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    document.getElementById('manual-date').value = `${yyyy}-${mm}-${dd}`;
+    // 根據記帳月份帶入預設日期（最新一期為當日，其餘為該月 1 號）
+    updateManualDateByDefault(state.currentMonth);
     
     renderQuickTags();
     manualModal.classList.add('active');
@@ -831,6 +992,7 @@ document.getElementById('confirm-pdf-btn').addEventListener('click', () => {
     const showHousehold = document.getElementById('pdf-opt-household').checked;
     const showFamily = document.getElementById('pdf-opt-family').checked;
     const showCombined = document.getElementById('pdf-opt-combined').checked;
+    const excludePrivate = document.getElementById('pdf-opt-exclude-private').checked;
 
     // 動態加上或移除 print-hidden class
     const secHousehold = document.getElementById('print-section-household');
@@ -856,10 +1018,25 @@ document.getElementById('confirm-pdf-btn').addEventListener('click', () => {
         document.title = `家庭帳務整理${state.currentMonth}`;
     }
 
-    // 強制切換到「家用」
-    state.currentTab = '家用';
+    // 根據勾選的小計項目，自動切換列印時的明細表格頁籤
+    let printTab = 'all';
+    if (showHousehold && showFamily) {
+        printTab = 'all'; // 兩個小計都勾選，則印出全部明細
+    } else if (showHousehold) {
+        printTab = '瑗家用墊款'; // 只勾選瑗家用墊款，則僅印出瑗家用明細
+    } else if (showFamily) {
+        printTab = '綉家庭開支'; // 只勾選綉家庭開支，則僅印出綉家庭明細
+    } else {
+        printTab = prevTab; // 若都沒勾選，維持當前所在的頁籤明細
+    }
+
+    // 設定列印狀態與排除私用旗標
+    state.isPrinting = true;
+    state.excludePrivate = excludePrivate;
+
+    state.currentTab = printTab;
     document.querySelectorAll('.tab-btn').forEach(b => {
-        b.classList.toggle('active', b.getAttribute('data-tab') === '家用');
+        b.classList.toggle('active', b.getAttribute('data-tab') === printTab);
     });
     renderTable();
     updateSummary();
@@ -871,6 +1048,8 @@ document.getElementById('confirm-pdf-btn').addEventListener('click', () => {
         // 列印結束後自動恢復原本的頁籤、標題，並移除列印隱藏標籤
         document.title = originalTitle;
         state.currentTab = prevTab;
+        state.isPrinting = false;
+        state.excludePrivate = false;
         document.querySelectorAll('.tab-btn').forEach(b => {
             b.classList.toggle('active', b.getAttribute('data-tab') === prevTab);
         });
@@ -1343,7 +1522,7 @@ async function handleParsedBankRecords(records) {
                 amount_foreign: null,
                 currency: 'TWD',
                 category: '未分類',
-                usage_type: '家用',
+                usage_type: '瑗家用墊款',
                 custom_summary: null,
                 matched_order: null
             });
@@ -1418,6 +1597,158 @@ async function handleParsedEcommerceOrders(orders) {
 
     alert(`✅ AI 辨識出 ${orders.length} 筆電商訂單。\n- 🆕 新載入：${newCount} 筆\n- 🛡️ 已自動過濾重複：${dupCount} 筆\n- 🔍 已為您自動比對並帶入項目：${matchCount} 筆交易！`);
     await loadData();
+}
+
+// === 年度統計報表邏輯 (SPA 獨立頁面) ===
+let reportState = {
+    currentYear: new Date().getFullYear()
+};
+
+// 初始化年度報表視圖與綁定事件
+function initReportView() {
+    if (showReportBtn) {
+        showReportBtn.addEventListener('click', () => {
+            // 切換視圖
+            document.querySelector('.app-container').style.display = 'none';
+            document.getElementById('report-view').style.display = 'block';
+            
+            // 設定年份預設為目前主選單月份的年份
+            if (state.currentMonth && state.currentMonth.length === 6) {
+                reportState.currentYear = parseInt(state.currentMonth.substring(0, 4), 10);
+            } else {
+                reportState.currentYear = new Date().getFullYear();
+            }
+            
+            updateReportYearLabel();
+            loadReportData();
+        });
+    }
+
+    if (backToMainBtn) {
+        backToMainBtn.addEventListener('click', () => {
+            // 返回主畫面
+            document.getElementById('report-view').style.display = 'none';
+            document.querySelector('.app-container').style.display = 'block';
+            loadData(); // 重新載入主畫面資料以防萬一
+        });
+    }
+
+    if (prevYearBtn) {
+        prevYearBtn.addEventListener('click', () => {
+            reportState.currentYear -= 1;
+            updateReportYearLabel();
+            loadReportData();
+        });
+    }
+
+    if (nextYearBtn) {
+        nextYearBtn.addEventListener('click', () => {
+            reportState.currentYear += 1;
+            updateReportYearLabel();
+            loadReportData();
+        });
+    }
+}
+
+// 更新報表頁面顯示的年份文字
+function updateReportYearLabel() {
+    if (reportYearLabel) {
+        reportYearLabel.textContent = `${reportState.currentYear} 年`;
+    }
+}
+
+// 從 Supabase 載入該年份的特定明細項目統計數據 (只統計指定 19 個明細項目，其餘排除不計)
+async function loadReportData() {
+    const tableBody = document.getElementById('report-table-body');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding: 3rem;">⏳ 正在從雲端載入 ${reportState.currentYear} 年度指定項目數據...</td></tr>`;
+    
+    // 定義要統計的 19 個指定明細項目 (依照使用者指定的順序顯示)
+    const REPORT_ITEMS = [
+        "水費", "電費", "電話費", "櫟安司機揹錢", "房屋稅", 
+        "地價稅", "國有財產局地租", "外看薪水", "外看餐費", "勞保費", 
+        "健保費", "餐食", "藥品", "櫟安交通費", "鼻胃管插管", 
+        "墊款少付費用", "就業安定費", "中信公營代收", "就醫交通"
+    ];
+    
+    try {
+        // 從 Supabase 取得該年份的所有交易明細 (讀取 amount_twd, month, details, category)
+        const { data, error } = await supabaseClient
+            .from('transactions')
+            .select('amount_twd, month, details, category')
+            .like('month', `${reportState.currentYear}%`);
+            
+        if (error) throw error;
+        
+        // 建立各明細項目的 12 個月份統計數據
+        const dataStructure = {};
+        REPORT_ITEMS.forEach(item => {
+            dataStructure[item] = Array(12).fill(0);
+        });
+        
+        if (data) {
+            data.forEach(r => {
+                if (!r.month || r.month.length !== 6) return;
+                
+                // 清理消費明細文字，移除發票或宗親會標記
+                const cleanDetail = r.details ? r.details.replace(' [發票]', '').replace(' [宗親會]', '').trim() : '';
+                const amt = parseFloat(r.amount_twd) || 0;
+                const monthVal = parseInt(r.month.substring(4, 6), 10);
+                const monthIdx = monthVal - 1;
+                
+                // 如果明細為「餐食」或交易分類為「食」，則通通計入「餐食」項目
+                if (cleanDetail === '餐食' || r.category === '食') {
+                    dataStructure['餐食'][monthIdx] += amt;
+                } else if (REPORT_ITEMS.includes(cleanDetail)) {
+                    // 其餘 18 個指定明細項目，依精確名稱累計
+                    if (cleanDetail !== '餐食') {
+                        dataStructure[cleanDetail][monthIdx] += amt;
+                    }
+                }
+            });
+        }
+        
+        let html = '';
+        const monthlyGrandTotals = Array(12).fill(0);
+        let yearlyGrandTotal = 0;
+        
+        // 遍歷所有指定的明細項目進行渲染
+        REPORT_ITEMS.forEach(item => {
+            const monthlyTotals = dataStructure[item];
+            const rowTotal = monthlyTotals.reduce((sum, val) => sum + val, 0);
+            
+            let rowHtml = `<tr>
+                <td style="text-align: left; padding-left: 1.5rem; font-weight: bold; color: var(--text-primary); border-top: 1px solid #cbd5e0;">
+                    ${item}
+                </td>`;
+            
+            for (let i = 0; i < 12; i++) {
+                const val = monthlyTotals[i];
+                rowHtml += `<td class="text-right" style="font-family: monospace; border-top: 1px solid #cbd5e0;">${val > 0 ? val.toLocaleString() : '-'}</td>`;
+                // 累計到月度小計
+                monthlyGrandTotals[i] += val;
+            }
+            
+            rowHtml += `<td class="text-right" style="font-weight: bold; background: #edf2f7; font-family: monospace; border-top: 1px solid #cbd5e0;">${rowTotal > 0 ? rowTotal.toLocaleString() : '-'}</td></tr>`;
+            html += rowHtml;
+            yearlyGrandTotal += rowTotal;
+        });
+        
+        // 渲染最底部的小計列 (Monthly Grand Totals)
+        let totalRowHtml = `<tr style="font-weight: bold; background: #edf2f7; border-top: 2px solid #cbd5e0;"><td style="text-align: left; padding-left: 1.5rem;">月份小計</td>`;
+        for (let i = 0; i < 12; i++) {
+            totalRowHtml += `<td class="text-right" style="font-family: monospace;">${monthlyGrandTotals[i] > 0 ? monthlyGrandTotals[i].toLocaleString() : '-'}</td>`;
+        }
+        totalRowHtml += `<td class="text-right" style="background: #cbd5e0; color: var(--primary-color); font-size: 1.05rem; font-family: monospace;">${yearlyGrandTotal > 0 ? yearlyGrandTotal.toLocaleString() : '-'}</td></tr>`;
+        
+        html += totalRowHtml;
+        tableBody.innerHTML = html;
+        
+    } catch (err) {
+        console.error("載入報表失敗:", err);
+        tableBody.innerHTML = `<tr><td colspan="14" style="text-align:center; color:red; padding: 3rem;">❌ 載入報表失敗！請確認網路連線。</td></tr>`;
+    }
 }
 
 // 啟動應用程式

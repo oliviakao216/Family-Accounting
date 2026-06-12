@@ -16,11 +16,15 @@
                 <h1>家庭帳務系統 <span style="font-size:1rem; color:#48bb78;">🟢 雲端同步中</span></h1>
                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
                     <span style="font-weight: bold; color: var(--text-secondary);">月份:</span>
-                    <select id="month-selector" class="cat-select" style="font-size: 1.2rem; font-weight: bold; width: auto; border-color: var(--primary-color);">
-                        <option value="202604">2026 年 04 月</option>
-                        <option value="202605" selected>2026 年 05 月</option>
-                        <option value="202606">2026 年 06 月</option>
-                    </select>
+                    <div style="display: flex; align-items: center; gap: 0.3rem;">
+                        <button id="prev-month-btn" class="secondary-btn" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; border-radius: 6px; border: 1px solid var(--primary-color); background: white; color: var(--primary-color); font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="上一個月">◀</button>
+                        <select id="month-selector" class="cat-select" style="font-size: 1.2rem; font-weight: bold; width: auto; border-color: var(--primary-color); margin: 0;">
+                            <option value="202604">2026 年 04 月</option>
+                            <option value="202605" selected>2026 年 05 月</option>
+                            <option value="202606">2026 年 06 月</option>
+                        </select>
+                        <button id="next-month-btn" class="secondary-btn" style="padding: 0.3rem 0.6rem; font-size: 0.9rem; border-radius: 6px; border: 1px solid var(--primary-color); background: white; color: var(--primary-color); font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="下一個月">▶</button>
+                    </div>
                 </div>
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; align-items: center;">
@@ -29,6 +33,9 @@
                 </button>
                 <button id="settings-btn" class="secondary-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; background: #e2e8f0; color: #4a5568; border: none; cursor: pointer;" title="設定 Gemini API Key">
                     <span style="font-size: 1.1rem;">⚙️</span>
+                </button>
+                <button id="show-report-btn" class="primary-btn" style="background-color: #6b46c1; border-color: #553c9a; padding: 0.5rem 1rem; font-size: 0.9rem;">
+                    <span class="icon">📊</span> 年度報表
                 </button>
                 <button id="ai-upload-btn" class="primary-btn" style="background-color: #319795; border-color: #2c7a7b; padding: 0.5rem 1rem; font-size: 0.9rem;">
                     <span class="icon">📸</span> AI 圖片記帳
@@ -62,7 +69,7 @@
 
                 <div id="sidebar-content">
                     <div id="print-section-household">
-                        <h2>📊 家用分類小計</h2>
+                        <h2>📊 瑗家用墊款分類小計</h2>
                         <div class="summary-list" id="summary-list">
                             <!-- 分類小計會由 JS 動態生成 -->
                         </div>
@@ -77,7 +84,7 @@
                     </div>
 
                     <div id="print-section-family">
-                        <h2>📈 家庭開支小計</h2>
+                        <h2>📈 綉家庭開支小計</h2>
                         <div class="summary-list" id="family-summary-list">
                             <!-- 家庭開支分類小計會由 JS 動態生成 -->
                         </div>
@@ -89,7 +96,7 @@
 
                     <div id="print-section-combined">
                         <div class="total-box" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);">
-                            <span>合併總計 (家用 + 家庭開支)</span>
+                            <span>合併總計 (瑗家用墊款 + 綉家庭開支)</span>
                             <h3 id="combined-grand-total">NT$ 0</h3>
                         </div>
                     </div>
@@ -107,9 +114,9 @@
                     </div>
                     <div class="tabs" id="usage-tabs">
                         <button class="tab-btn active" data-tab="all">全部</button>
-                        <button class="tab-btn" data-tab="家用">家用</button>
+                        <button class="tab-btn" data-tab="瑗家用墊款">瑗家用墊款</button>
                         <button class="tab-btn" data-tab="私用">私用</button>
-                        <button class="tab-btn" data-tab="家庭開支">家庭開支</button>
+                        <button class="tab-btn" data-tab="綉家庭開支">綉家庭開支</button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -117,13 +124,13 @@
                         <thead>
                             <tr>
                                 <th>信用卡/銀行</th>
-                                <th>日期</th>
-                                <th>消費明細</th>
-                                <th>分類 (可修改)</th>
+                                <th class="sortable" data-sort="date" style="cursor: pointer; user-select: none;">日期 <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="details" style="cursor: pointer; user-select: none;">消費明細 <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="category" style="cursor: pointer; user-select: none;">分類 (可修改) <span class="sort-icon"></span></th>
                                 <th>購買項目摘要 (可修改)</th>
-                                <th>宗親會</th>
-                                <th>歸屬</th>
-                                <th class="text-right">台幣金額</th>
+                                <th class="sortable" data-sort="clan" style="cursor: pointer; user-select: none;">宗親會 <span class="sort-icon"></span></th>
+                                <th class="sortable" data-sort="usageType" style="cursor: pointer; user-select: none;">歸屬 <span class="sort-icon"></span></th>
+                                <th class="sortable text-right" data-sort="amountTWD" style="cursor: pointer; user-select: none;">台幣金額 <span class="sort-icon"></span></th>
                                 <th class="text-right">外幣金額</th>
                                 <th style="text-align: center;">操作</th>
                             </tr>
@@ -180,9 +187,9 @@
             
             <label style="font-weight: bold; font-size: 0.9rem;">歸屬</label>
             <select id="manual-usage" class="usage-select" style="width: 100%; margin-bottom: 1.5rem; padding: 0.5rem;">
-                <option value="家用" selected>家用</option>
+                <option value="瑗家用墊款" selected>瑗家用墊款</option>
                 <option value="私用">私用</option>
-                <option value="家庭開支">家庭開支</option>
+                <option value="綉家庭開支">綉家庭開支</option>
             </select>
             
             <div style="display: flex; gap: 1rem; justify-content: flex-end;">
@@ -267,13 +274,16 @@
             
             <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem;">
-                    <input type="checkbox" id="pdf-opt-household" checked style="width: auto;"> 📊 家用分類小計與總額 (含宗親會)
+                    <input type="checkbox" id="pdf-opt-household" checked style="width: auto;"> 📊 瑗家用墊款分類小計與總額 (含宗親會)
                 </label>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem;">
-                    <input type="checkbox" id="pdf-opt-family" checked style="width: auto;"> 📈 家庭開支小計與總額
+                    <input type="checkbox" id="pdf-opt-family" checked style="width: auto;"> 📈 綉家庭開支小計與總額
                 </label>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem;">
-                    <input type="checkbox" id="pdf-opt-combined" checked style="width: auto;"> 🔗 合併總計 (家用 + 家庭開支)
+                    <input type="checkbox" id="pdf-opt-combined" checked style="width: auto;"> 🔗 合併總計 (瑗家用墊款 + 綉家庭開支)
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; color: #e53e3e; font-weight: bold; border-top: 1px dashed #cbd5e0; padding-top: 0.5rem; margin-top: 0.25rem;">
+                    <input type="checkbox" id="pdf-opt-exclude-private" checked style="width: auto;"> 🚫 PDF 排除「私用」明細資料
                 </label>
             </div>
             
@@ -282,6 +292,49 @@
                 <button id="confirm-pdf-btn" class="primary-btn" style="padding: 0.5rem 1rem;">確認並列印</button>
             </div>
         </div>
+    </div>
+
+    <!-- 年度分類統計報表視圖 (SPA 獨立頁面) -->
+    <div id="report-view" style="display: none;">
+        <header class="header">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button id="back-to-main-btn" class="secondary-btn" style="background-color: #4a5568; color: white;">⬅ 返回記帳表</button>
+                <h1 style="margin: 0; font-size: 1.8rem;">📊 年度分類統計報表</h1>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.8rem; background: white; padding: 0.4rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+                <button id="prev-year-btn" class="secondary-btn" style="padding: 0.25rem 0.6rem; font-size: 0.85rem; cursor: pointer;">◀ 上一年</button>
+                <span id="report-year-label" style="font-size: 1.25rem; font-weight: bold; min-width: 80px; text-align: center; color: var(--text-primary);">2026 年</span>
+                <button id="next-year-btn" class="secondary-btn" style="padding: 0.25rem 0.6rem; font-size: 0.85rem; cursor: pointer;">下一年 ▶</button>
+            </div>
+        </header>
+        
+        <main class="main-content" style="margin-top: 1rem; padding: 1.5rem;">
+            <div class="table-container" style="overflow-x: auto;">
+                <table class="transaction-table" id="report-table" style="min-width: 1000px;">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 130px; font-weight: bold; color: var(--text-primary);">分類名稱</th>
+                            <th style="text-align: right; color: var(--text-primary);">1 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">2 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">3 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">4 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">5 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">6 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">7 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">8 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">9 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">10 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">11 月</th>
+                            <th style="text-align: right; color: var(--text-primary);">12 月</th>
+                            <th style="text-align: right; font-weight: bold; background: #edf2f7; color: var(--text-primary); min-width: 100px;">分類小計</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-table-body">
+                        <!-- 資料由 JS 動態生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </main>
     </div>
 
     <script src="script.js"></script>
