@@ -731,7 +731,6 @@ function renderTable() {
         }
     });
 }
-
 // 更新小計
 function updateSummary() {
     const summary = {};
@@ -762,6 +761,10 @@ function updateSummary() {
     const familySummaryList = document.getElementById('family-summary-list');
     if (familySummaryList) familySummaryList.innerHTML = '';
     
+    // 獲取各家用分類合併小計的容器
+    const combinedSummaryList = document.getElementById('combined-summary-list');
+    if (combinedSummaryList) combinedSummaryList.innerHTML = '';
+    
     const colors = {
         "食": "var(--cat-food)", "交通": "var(--cat-transport)", 
         "醫療": "var(--cat-medical)", "家用": "var(--cat-household)",
@@ -774,6 +777,12 @@ function updateSummary() {
         }
         if (cat !== "未分類" && familySummary[cat] !== 0 && familySummaryList) {
             familySummaryList.innerHTML += `<div class="summary-item"><div class="summary-label"><span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>${cat}</div><div class="summary-value">NT$ ${familySummary[cat]}</div></div>`;
+        }
+        
+        // 新增：各家用分類的合併小計（瑗家用墊款 + 綉家庭開支）
+        const combinedAmt = (summary[cat] || 0) + (familySummary[cat] || 0);
+        if (cat !== "未分類" && combinedAmt !== 0 && combinedSummaryList) {
+            combinedSummaryList.innerHTML += `<div class="summary-item"><div class="summary-label"><span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>${cat}</div><div class="summary-value">NT$ ${combinedAmt}</div></div>`;
         }
     });
 
