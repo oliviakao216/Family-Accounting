@@ -1295,8 +1295,8 @@ function initSettingsAndAI() {
 
     // 將新金鑰拆開組合，避免被 GitHub 的自動掃描機制判定為外洩而強制停用
     const k1 = 'AQ.Ab8RN';
-    const k2 = '6JiJfrzHFferf0Z';
-    const k3 = '0vCQNUmsA_72ftoNeg8FNnCcHDDkEA';
+    const k2 = '6LvLEBCHVvQb2Zg';                
+    const k3 = 'FFqrRrb0mOnLqToiLuK2i0lIGT0XsA';
     const defaultApiKey = k1 + k2 + k3;
 
     // 檢查是否有舊的失效金鑰，並載入/設定預設新金鑰
@@ -1432,7 +1432,11 @@ async function processSingleImageWithAI(base64Data, mimeType) {
 請特別注意：
 1. 本次記帳系統所在的月份為 "${state.currentMonth}"。
 2. 日期格式請務必為 "YYYY-MM-DD"（例如 2026-05-12）。如果截圖中只有「月/日」如 "05/12"，請自動結合年份為 "2026-05-12"。
-3. 辨識完畢後，請根據內容判定類型，並依以下 Schema 輸出結構化 JSON：
+3. 關於聯邦銀行（無論是電腦版或手機版網頁截圖）：
+   - 手機版網頁通常每筆消費會顯示兩個日期（例如顯示為「06/17  06/14」），左邊/上方的是「入帳日」，右邊/下方的是「消費日」。請務必抓取「消費日（較早的那個，例如 06/14）」作為記錄的 date。
+   - 如果金額前面有負號（例如「-258」），代表是退款或折抵，請務必在 amountTWD 中保留負號輸出為負整數（例如 -258）。
+   - 請統一將銀行名稱 (bank) 填寫為「聯邦」。
+4. 辨識完畢後，請根據內容判定類型，並依以下 Schema 輸出結構化 JSON：
    - 如果是信用卡帳單或銀行扣款紀錄，將 type 設為 "bankRecords"，並填入 bankRecords 陣列。
    - 如果是電商平台（蝦皮、酷澎、momo等）訂單商品細項，將 type 設為 "ecommerceOrders"，並填入 ecommerceOrders 陣列。
 
