@@ -23,7 +23,7 @@ let state = {
     ecommerceOrders: [],
     conflicts: [], // 需要手動選擇的衝突清單
     currentConflict: null,
-    currentMonth: "", // 將在 initMonthSelector 初始化
+    currentMonth: localStorage.getItem('lastSelectedMonth') || `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`,
     currentTab: 'all',
     editingId: null,
     sortField: 'date', // 預設排序為日期
@@ -52,6 +52,74 @@ const backToMainBtn = document.getElementById('back-to-main-btn');
 const prevYearBtn = document.getElementById('prev-year-btn');
 const nextYearBtn = document.getElementById('next-year-btn');
 const reportYearLabel = document.getElementById('report-year-label');
+
+// 同步設定月份選單與標籤，防止畫面載入時出現 5 月的閃爍現象
+function initMonthSelectorSync() {
+    const today = new Date();
+    const thisYear = today.getFullYear();
+    const thisMonth = today.getMonth(); // 0-11
+    const thisDay = today.getDate();
+    
+    const monthsSet = new Set();
+    
+    // 預設月份
+    monthsSet.add("202604");
+    monthsSet.add("202605");
+    monthsSet.add("202606");
+    
+    // 補上 2025/01 - 2026/03 的回溯月份
+    for (let m = 1; m <= 12; m++) {
+        monthsSet.add(`2025${String(m).padStart(2, '0')}`);
+    }
+    for (let m = 1; m <= 3; m++) {
+        monthsSet.add(`2026${String(m).padStart(2, '0')}`);
+    }
+    
+    const thisMonthStr = `${thisYear}${String(thisMonth + 1).padStart(2, '0')}`;
+    monthsSet.add(thisMonthStr);
+    
+    // 每月 15 號（含）之後，自動新增下個月的選項
+    if (thisDay >= 15) {
+        let nextMonth = thisMonth + 1;
+        let nextYear = thisYear;
+        if (nextMonth > 11) {
+            nextMonth = 0;
+            nextYear += 1;
+        }
+        const nextMonthStr = `${nextYear}${String(nextMonth + 1).padStart(2, '0')}`;
+        monthsSet.add(nextMonthStr);
+    }
+    
+    const sortedMonths = Array.from(monthsSet).sort();
+    
+    let currentSelected = state.currentMonth;
+    if (!sortedMonths.includes(currentSelected)) {
+        sortedMonths.push(currentSelected);
+        sortedMonths.sort();
+    }
+    
+    const optionsHtml = sortedMonths.map(m => {
+        const y = m.substring(0, 4);
+        const mon = m.substring(4, 6);
+        return `<option value="${m}">${y} 年 ${mon} 月</option>`;
+    }).join('');
+    
+    if (monthSelector) {
+        monthSelector.innerHTML = optionsHtml;
+        monthSelector.value = currentSelected;
+    }
+    
+    // 同步更新標籤
+    const initY = currentSelected.substring(0, 4);
+    const initM = parseInt(currentSelected.substring(4, 6), 10).toString();
+    const yearLabel = document.getElementById('year-label');
+    const monthLabel = document.getElementById('month-label');
+    if (yearLabel) yearLabel.textContent = initY;
+    if (monthLabel) monthLabel.textContent = initM;
+}
+
+// 執行同步月份初始化
+initMonthSelectorSync();
 
 // 切換月份
 monthSelector.addEventListener('change', (e) => {
@@ -93,6 +161,7 @@ manualMonthSelector.addEventListener('change', (e) => {
 });
 
 // 初始化月份選擇器（從資料庫載入所有已存在交易的月份，並補上預設月份）
+// 異步從雲端載入其他已存在交易的月份，並合併到選單中
 async function initMonthSelector() {
     try {
         // 從 Supabase 取得所有交易的月份
@@ -102,65 +171,35 @@ async function initMonthSelector() {
             
         if (error) throw error;
         
-        // 取得所有 unique 的月份
-        const monthsSet = new Set();
-        if (data) {
+        if (data && data.length > 0) {
+            // 讀取當前已經渲染的選項
+            const currentOptions = Array.from(monthSelector.options).map(o => o.value);
+            const newMonths = [];
+            
             data.forEach(r => {
-                if (r.month && r.month.length === 6) {
-                    monthsSet.add(r.month);
+                if (r.month && r.month.length === 6 && !currentOptions.includes(r.month)) {
+                    newMonths.push(r.month);
                 }
             });
+            
+            // 如果有在雲端發現本地初始選單沒有的月份，就重新渲染合併
+            if (newMonths.length > 0) {
+                const allMonths = [...currentOptions, ...newMonths].sort();
+                const optionsHtml = allMonths.map(m => {
+                    const y = m.substring(0, 4);
+                    const mon = m.substring(4, 6);
+                    return `<option value="${m}">${y} 年 ${mon} 月</option>`;
+                }).join('');
+                
+                const val = monthSelector.value;
+                monthSelector.innerHTML = optionsHtml;
+                monthSelector.value = val;
+            }
         }
-        
-        // 額外加上一些預設月份與當前月份，以防資料庫是空的
-        monthsSet.add("202604");
-        monthsSet.add("202605");
-        monthsSet.add("202606");
-        
-        // 補上 2025/01 - 2026/03 的回溯月份
-        for (let m = 1; m <= 12; m++) {
-            monthsSet.add(`2025${String(m).padStart(2, '0')}`);
-        }
-        for (let m = 1; m <= 3; m++) {
-            monthsSet.add(`2026${String(m).padStart(2, '0')}`);
-        }
-        
-        const today = new Date();
-        const thisMonthStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}`;
-        monthsSet.add(thisMonthStr);
-        
-        // 轉成陣列並排序 (由舊到新)
-        const sortedMonths = Array.from(monthsSet).sort();
-        
-        // 記住目前的選擇值，預設為今天的月份或 202605
-        let currentSelected = localStorage.getItem('lastSelectedMonth');
-        if (!currentSelected) {
-            currentSelected = monthsSet.has(thisMonthStr) ? thisMonthStr : "202605";
-        }
-        
-        // 如果 currentSelected 不在 sortedMonths 中，也把它加進去
-        if (!sortedMonths.includes(currentSelected)) {
-            sortedMonths.push(currentSelected);
-            sortedMonths.sort();
-        }
-        
-        // 渲染選單
-        const optionsHtml = sortedMonths.map(m => {
-            const y = m.substring(0, 4);
-            const mon = m.substring(4, 6);
-            return `<option value="${m}">${y} 年 ${mon} 月</option>`;
-        }).join('');
-        
-        monthSelector.innerHTML = optionsHtml;
-        
-        // 設定選取的值
-        monthSelector.value = currentSelected;
-        state.currentMonth = currentSelected;
-        updateMonthNavButtons(); // 初始化月份後更新按鈕狀態
+        updateMonthNavButtons(); // 更新左右切換按鈕狀態
         
     } catch (e) {
-        console.error("載入月份失敗，使用預設選單", e);
-        state.currentMonth = "202605";
+        console.error("載入雲端月份失敗，使用同步初始化的預設選單", e);
     }
 }
 
