@@ -1254,14 +1254,14 @@ function initSettingsAndAI() {
     const aiFileUpload = document.getElementById('ai-file-upload');
     const loadingOverlay = document.getElementById('loading-overlay');
 
-    // 預設將 API Key 寫入 input
-    const defaultApiKey = 'AIzaSyALUfYyDZwtxwTG8ffv-eSQrgh_f1ozULc';
+    // 檢查並清除已失效的洩漏預設金鑰，避免使用者繼續誤用
+    const leakedApiKey = 'AIzaSyALUfYyDZwtxwTG8ffv-eSQrgh_f1ozULc';
     let savedApiKey = localStorage.getItem('gemini_api_key');
-    if (!savedApiKey) {
-        localStorage.setItem('gemini_api_key', defaultApiKey);
-        savedApiKey = defaultApiKey;
+    if (savedApiKey === leakedApiKey) {
+        localStorage.removeItem('gemini_api_key');
+        savedApiKey = '';
     }
-    geminiKeyInput.value = savedApiKey;
+    geminiKeyInput.value = savedApiKey || '';
 
     // 開啟設定彈窗
     settingsBtn.addEventListener('click', () => {
