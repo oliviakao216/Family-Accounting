@@ -370,6 +370,14 @@ async function init() {
         });
     });
 
+    // 綁定更新按鈕 (重新整理)
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            window.location.reload();
+        });
+    }
+
     await loadData();
 }
 
