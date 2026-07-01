@@ -626,8 +626,9 @@ body {
         margin: 1cm; 
     }
     
-    /* 徹底解決手機列印下 overflow 導致無法跨頁分頁、產生空白首頁的 Bug */
+    /* 徹底解決手機列印下 overflow 與定位導致無法跨頁分頁、產生空白首頁的 Bug */
     html, body, .app-container, .content-wrapper, .main-content, .table-container {
+        position: static !important;
         overflow: visible !important;
         height: auto !important;
         max-height: none !important;
@@ -719,6 +720,7 @@ body {
     .transaction-table th, .transaction-table td {
         padding: 6px 4px !important;
         white-space: normal !important; /* 允許內容換行，防止撐寬 */
+        min-width: auto !important; /* 解除手機版設定的 140px/80px 最小寬度限制，防止撐寬被切 */
     }
     .amount {
         font-size: 11px !important;
