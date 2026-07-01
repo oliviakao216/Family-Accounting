@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 防止被網路搜尋引擎索引，保護個人資料隱私 -->
+    <meta name="robots" content="noindex, nofollow">
     <title>家庭帳務系統 (雲端版)</title>
     <link rel="stylesheet" href="style.css">
     <!-- 引入 Supabase CDN -->
@@ -15,6 +17,9 @@
             <div>
                 <h1>家庭帳務系統 <span style="font-size:1rem; color:#48bb78;">🟢 雲端同步中</span></h1>
                 <div style="font-size: 0.75rem; color: #a0aec0; margin-top: 2px;">系統更新時間：2026-06-25 21:36</div>
+                <div class="print-hidden" style="font-size: 0.8rem; color: #dd6b20; background-color: #fffaf0; border: 1px solid #feebc8; padding: 0.4rem 0.8rem; border-radius: 6px; margin-top: 0.5rem; max-width: 500px; line-height: 1.4; font-weight: 500;">
+                    ⚠️ 家庭開支記帳資料以 2026/5 起為紀錄範圍，2026/5 前資料未完整建置，請以 2026/5 起之紀錄作為參考。
+                </div>
                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
                     <span style="font-weight: bold; color: var(--text-secondary);">月份:</span>
                     <div style="display: flex; align-items: center; gap: 0.3rem;">
@@ -40,15 +45,18 @@
                 </button>
                 <input type="file" id="ai-file-upload" accept="image/*" style="display: none;" multiple>
                 
+                <button id="print-btn" class="primary-btn" style="background-color: #4a5568; border-color: #2d3748; padding: 0.5rem 1rem; font-size: 0.9rem;">
+                    <span class="icon">🖨️</span> 匯出 PDF
+                </button>
+                
+                <button id="bank-total-btn" style="background: transparent; border: none; color: #a0aec0; cursor: pointer; font-size: 1.2rem; padding: 0.2rem; min-width: 20px; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px;" title="計算各銀行總計">.</button>
+                
                 <div class="desktop-only-btns" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     <button id="import-btn" class="secondary-btn" style="background-color: #ecc94b; color: #744210;">
                         <span class="icon">📂</span> 匯入資料檔 (JSON)
                     </button>
                     <input type="file" id="file-upload" accept=".json" style="display: none;">
                     
-                    <button id="print-btn" class="primary-btn" style="background-color: #4a5568; border-color: #2d3748;">
-                        <span class="icon">🖨️</span> 匯出 PDF
-                    </button>
                     <button id="run-match-btn" class="primary-btn">
                         <span class="icon">🔍</span> 執行自動比對
                     </button>

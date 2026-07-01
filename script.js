@@ -23,7 +23,15 @@ let state = {
     ecommerceOrders: [],
     conflicts: [], // 需要手動選擇的衝突清單
     currentConflict: null,
-    currentMonth: localStorage.getItem('lastSelectedMonth') || `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+    currentMonth: (function() {
+        const today = new Date();
+        const thisMonthStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}`;
+        // 當日期已經走到了該月份，則於 1 號時預設顯示於該月份
+        if (today.getDate() === 1) {
+            return thisMonthStr;
+        }
+        return localStorage.getItem('lastSelectedMonth') || thisMonthStr;
+    })(),
     currentTab: 'all',
     editingId: null,
     sortField: 'date', // 預設排序為日期
@@ -276,6 +284,75 @@ async function init() {
     
     // 初始化年度報表事件
     initReportView();
+
+    // 綁定計算各銀行總計按鈕
+    const bankTotalBtn = document.getElementById('bank-total-btn');
+    if (bankTotalBtn) {
+        bankTotalBtn.addEventListener('click', () => {
+            if (!state.bankRecords || state.bankRecords.length === 0) {
+                alert("當前月份無交易紀錄，無法計算銀行總計。");
+                return;
+            }
+            
+            // 建立統計結構：大類為 瑗 / 綉，小類為各銀行
+            const totals = {
+                yuan: {
+                    label: "瑗",
+                    banks: {},
+                    subtotal: 0
+                },
+                xiu: {
+                    label: "綉",
+                    banks: {},
+                    subtotal: 0
+                }
+            };
+            
+            state.bankRecords.forEach(r => {
+                const bankName = r.bank || "未指定";
+                const amt = parseFloat(r.amountTWD) || 0;
+                
+                // 區分大類 (瑗家用墊款與私用歸為瑗，其餘綉家庭開支歸為綉)
+                let categoryKey = "yuan";
+                if (r.usageType === '綉家庭開支') {
+                    categoryKey = "xiu";
+                }
+                
+                // 累加小類 (銀行) 金額
+                if (!totals[categoryKey].banks[bankName]) {
+                    totals[categoryKey].banks[bankName] = 0;
+                }
+                totals[categoryKey].banks[bankName] += amt;
+                totals[categoryKey].subtotal += amt;
+            });
+            
+            let message = `🏦 ${state.currentMonth.substring(0, 4)} 年 ${parseInt(state.currentMonth.substring(4, 6), 10)} 月各銀行總計：\n\n`;
+            let grandTotal = 0;
+            
+            // 呈現「瑗」的統計結果
+            if (totals.yuan.subtotal !== 0 || Object.keys(totals.yuan.banks).length > 0) {
+                message += `【 瑗 】\n`;
+                for (const bank in totals.yuan.banks) {
+                    message += `• ${bank}: NT$ ${totals.yuan.banks[bank].toLocaleString()}\n`;
+                }
+                message += `小計: NT$ ${totals.yuan.subtotal.toLocaleString()}\n\n`;
+                grandTotal += totals.yuan.subtotal;
+            }
+            
+            // 呈現「綉」的統計結果
+            if (totals.xiu.subtotal !== 0 || Object.keys(totals.xiu.banks).length > 0) {
+                message += `【 綉 】\n`;
+                for (const bank in totals.xiu.banks) {
+                    message += `• ${bank}: NT$ ${totals.xiu.banks[bank].toLocaleString()}\n`;
+                }
+                message += `小計: NT$ ${totals.xiu.subtotal.toLocaleString()}\n\n`;
+                grandTotal += totals.xiu.subtotal;
+            }
+            
+            message += `總計金額: NT$ ${grandTotal.toLocaleString()}`;
+            alert(message);
+        });
+    }
 
     // 綁定表頭排序點擊事件
     document.querySelectorAll('.sortable').forEach(th => {
