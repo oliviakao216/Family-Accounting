@@ -909,6 +909,48 @@ function updateSummary() {
     if (fGT) fGT.textContent = `NT$ ${familyGrandTotal}`;
     const cGT = document.getElementById('combined-grand-total');
     if (cGT) cGT.textContent = `NT$ ${grandTotal + familyGrandTotal}`;
+
+    // 更新年度發票合計
+    updateYearInvoiceTotal();
+}
+
+// 非同步計算當前年度的宗親會發票合計，並更新 DOM
+async function updateYearInvoiceTotal() {
+    if (!state.currentMonth || state.currentMonth.length !== 6) return;
+    const year = state.currentMonth.substring(0, 4);
+    
+    const invoiceYearLabel = document.getElementById('invoice-year-label');
+    if (invoiceYearLabel) {
+        invoiceYearLabel.textContent = year;
+    }
+    
+    const yearTotalEl = document.getElementById('household-invoice-year-total');
+    if (!yearTotalEl) return;
+    
+    try {
+        const { data, error } = await supabaseClient
+            .from('transactions')
+            .select('amount_twd, custom_summary')
+            .eq('usage_type', '瑗家用墊款')
+            .like('month', `${year}%`);
+            
+        if (error) throw error;
+        
+        let yearInvoiceTotal = 0;
+        if (data) {
+            data.forEach(r => {
+                if (r.custom_summary && (r.custom_summary.includes(' [發票]') || r.custom_summary.includes(' [宗親會]'))) {
+                    const amt = parseFloat(r.amount_twd) || 0;
+                    yearInvoiceTotal += amt;
+                }
+            });
+        }
+        
+        yearTotalEl.textContent = `NT$ ${yearInvoiceTotal.toLocaleString()}`;
+    } catch (err) {
+        console.error("計算年度辦公費合計失敗", err);
+        yearTotalEl.textContent = "NT$ 0";
+    }
 }
 
 // 快速標籤
