@@ -409,7 +409,7 @@ async function loadData() {
             return {
                 id: r.id,
                 month: r.month,
-                bank: r.bank,
+                bank: r.bank === '手帳' ? '現金' : r.bank,
                 date: r.date,
                 details: r.details,
                 amountTWD: r.amount_twd,
@@ -478,7 +478,7 @@ fileUpload.addEventListener('change', (e) => {
                     const insertData = data.bankRecords.map(r => ({
                         id: r.id || "m_" + Date.now() + Math.random(),
                         month: state.currentMonth,
-                        bank: r.bank,
+                        bank: r.bank === '手帳' ? '現金' : r.bank,
                         date: r.date,
                         details: r.details,
                         amount_twd: r.amountTWD,
@@ -1087,7 +1087,7 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
             const newRecord = {
                 id: "m_" + Date.now(),
                 month: selectedMonth,
-                bank: "手帳",
+                bank: "現金",
                 date: date,
                 details: details,
                 amount_twd: amountTWD,
