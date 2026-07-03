@@ -8,6 +8,11 @@ let CATEGORIES = [
     "未分類", "母親照顧", "醫療", "食", "交通", "家用"
 ];
 
+// 家庭現金流分類
+let CASHFLOW_CATEGORIES = [
+    "生活費入帳", "代墊償付(瑗)", "代墊償付(綉)", "代墊償付(外看)"
+];
+
 // 載入自訂分類
 const savedCat = localStorage.getItem('customCategories');
 if (savedCat) {
@@ -17,7 +22,16 @@ if (savedCat) {
     });
 }
 
+const savedCashflowCat = localStorage.getItem('customCashflowCategories');
+if (savedCashflowCat) {
+    const parsed = JSON.parse(savedCashflowCat);
+    parsed.forEach(c => {
+        if (!CASHFLOW_CATEGORIES.includes(c)) CASHFLOW_CATEGORIES.push(c);
+    });
+}
+
 // 全域狀態
+let lastSavedNotes = null; // 用於事件紀錄防重送
 let state = {
     bankRecords: [],
     ecommerceOrders: [],
@@ -30,10 +44,11 @@ let state = {
         if (today.getDate() === 1) {
             return thisMonthStr;
         }
-        return localStorage.getItem('lastSelectedMonth') || thisMonthStr;
+        return sessionStorage.getItem('lastSelectedMonth') || thisMonthStr;
     })(),
     currentTab: 'all',
     editingId: null,
+    modalType: 'expense', // 新增記帳模式，'expense' (開支) 或 'cashflow' (現金流)
     sortField: 'date', // 預設排序為日期
     sortOrder: 'desc', // 預設為降序
     isPrinting: false, // 是否正在列印中
@@ -44,7 +59,8 @@ let state = {
 const tableBody = document.getElementById('transaction-body');
 const summaryList = document.getElementById('summary-list');
 const grandTotalEl = document.getElementById('grand-total');
-const addManualBtn = document.getElementById('add-manual-btn');
+const addCashflowBtn = document.getElementById('add-cashflow-btn');
+const addExpenseBtn = document.getElementById('add-expense-btn');
 const importBtn = document.getElementById('import-btn');
 const fileUpload = document.getElementById('file-upload');
 const monthSelector = document.getElementById('month-selector');
@@ -132,7 +148,7 @@ initMonthSelectorSync();
 // 切換月份
 monthSelector.addEventListener('change', (e) => {
     state.currentMonth = e.target.value;
-    localStorage.setItem('lastSelectedMonth', state.currentMonth);
+    sessionStorage.setItem('lastSelectedMonth', state.currentMonth);
     const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
     state.ecommerceOrders = savedOrders ? JSON.parse(savedOrders) : [];
     // 重設比對按鈕狀態
@@ -378,7 +394,61 @@ async function init() {
         });
     }
 
+    // 綁定事件紀錄 textarea 的變更事件
+    const eventNotesTextarea = document.getElementById('event-notes');
+    if (eventNotesTextarea) {
+        eventNotesTextarea.addEventListener('change', (e) => {
+            saveEventNotes(e.target.value);
+        });
+        // 失去焦點也儲存
+        eventNotesTextarea.addEventListener('blur', (e) => {
+            saveEventNotes(e.target.value);
+        });
+    }
+
     await loadData();
+}
+
+// 儲存事件紀錄至雲端 (使用 upsert)
+async function saveEventNotes(text) {
+    if (text === lastSavedNotes) return;
+    lastSavedNotes = text;
+    
+    const noteId = `note_${state.currentMonth}`;
+    const statusEl = document.getElementById('event-notes-status');
+    
+    const dbUpdates = {
+        id: noteId,
+        month: state.currentMonth,
+        bank: '系統',
+        date: new Date().toISOString().split('T')[0],
+        details: '月度事件紀錄',
+        amount_twd: 0,
+        amount_foreign: null,
+        currency: 'TWD',
+        category: '系統備忘',
+        usage_type: '私用',
+        custom_summary: text
+    };
+
+    try {
+        const { error } = await supabaseClient
+            .from('transactions')
+            .upsert(dbUpdates, { onConflict: 'id' });
+            
+        if (error) throw error;
+        
+        // 顯示「已同步」提示，兩秒後自動隱藏
+        if (statusEl) {
+            statusEl.style.opacity = '1';
+            setTimeout(() => {
+                statusEl.style.opacity = '0';
+            }, 2000);
+        }
+    } catch (e) {
+        console.error("儲存事件紀錄失敗:", e);
+        alert("事件紀錄儲存至雲端失敗，請檢查網路連線。");
+    }
 }
 
 // 載入資料 (從 Supabase)
@@ -394,8 +464,31 @@ async function loadData() {
 
         if (error) throw error;
 
-        // 將資料庫的蛇形命名 (snake_case) 轉回原本的駝峰命名 (camelCase)
-        state.bankRecords = data.map(r => {
+        // 1. 進行雲端資料的前置清洗與轉換 (合併生活費的 details 與 category)
+        const noteId = `note_${state.currentMonth}`;
+        const cleanedData = data.map(r => {
+            let details = r.details;
+            let category = r.category;
+            let hasChanged = false;
+            
+            // 只要明細包含生活費撥款字眼，統一清洗為「生活費入帳（待確認）」且分類為「生活費入帳」
+            if (details === '生活費已撥款' || details === '生活費入帳（待確認）' || details === '生活費入帳') {
+                if (details !== '生活費入帳（待確認）') {
+                    details = '生活費入帳（待確認）';
+                    hasChanged = true;
+                }
+                if (category !== '生活費入帳') {
+                    category = '生活費入帳';
+                    hasChanged = true;
+                }
+            }
+            
+            if (hasChanged) {
+                // 背景非同步更新 Supabase 雲端資料庫
+                updateRecordInDb(r.id, { details: details, category: category });
+            }
+            
+            // 解析電商訂單摘要快取
             const matchedOrd = state.ecommerceOrders.find(o => o.id === r.matched_order);
             let customSum = r.custom_summary;
             if (!customSum && matchedOrd) {
@@ -403,25 +496,37 @@ async function loadData() {
                 let autoText = matchedOrd.items.slice(0, 2).map(i => i.name).join('、');
                 if (count > 2) autoText += '...等';
                 customSum = autoText;
-                // 背景補寫入 Supabase 雲端，防止跨終端快取缺漏
                 updateRecordInDb(r.id, { customSummary: autoText });
             }
+            
             return {
                 id: r.id,
                 month: r.month,
                 bank: r.bank === '手帳' ? '現金' : r.bank,
                 date: r.date,
-                details: r.details,
+                details: details,
                 amountTWD: r.amount_twd,
                 amountForeign: r.amount_foreign,
                 currency: r.currency,
-                category: r.category,
+                category: category,
                 usageType: r.usage_type,
                 customSummary: customSum,
                 matchedOrder: r.matched_order,
                 matchedItems: matchedOrd ? matchedOrd.items : []
             };
         });
+
+        // 2. 篩選出事件紀錄特殊交易並渲染至事件紀錄文字區
+        const noteRecord = cleanedData.find(r => r.id === noteId);
+        const eventNotesTextarea = document.getElementById('event-notes');
+        const notesVal = noteRecord ? (noteRecord.custom_summary || '') : '';
+        if (eventNotesTextarea) {
+            eventNotesTextarea.value = notesVal;
+        }
+        lastSavedNotes = notesVal; // 同步最後儲存值，防重複上傳
+
+        // 3. 將事件紀錄從明細中過濾剔除，其餘存入全域狀態
+        state.bankRecords = cleanedData.filter(r => r.id !== noteId);
         
         // 標記已經配對過的電商訂單為已配對，避免重複被配對
         state.ecommerceOrders.forEach(o => {
@@ -475,20 +580,26 @@ fileUpload.addEventListener('change', (e) => {
                 
                 if (confirmUpload) {
                     // 轉換為資料庫格式
-                    const insertData = data.bankRecords.map(r => ({
-                        id: r.id || "m_" + Date.now() + Math.random(),
-                        month: state.currentMonth,
-                        bank: r.bank === '手帳' ? '現金' : r.bank,
-                        date: r.date,
-                        details: r.details,
-                        amount_twd: r.amountTWD,
-                        amount_foreign: r.amountForeign || null,
-                        currency: r.currency || 'TWD',
-                        category: r.category || '未分類',
-                        usage_type: r.usageType || '瑗家用墊款',
-                        custom_summary: r.customSummary || null,
-                        matched_order: r.matchedOrder || null
-                    }));
+                    const insertData = data.bankRecords.map(r => {
+                        let details = r.details;
+                        if (details === '生活費已撥款') {
+                            details = '生活費入帳（待確認）';
+                        }
+                        return {
+                            id: r.id || "m_" + Date.now() + Math.random(),
+                            month: state.currentMonth,
+                            bank: r.bank === '手帳' ? '現金' : r.bank,
+                            date: r.date,
+                            details: details,
+                            amount_twd: r.amountTWD,
+                            amount_foreign: r.amountForeign || null,
+                            currency: r.currency || 'TWD',
+                            category: r.category || '未分類',
+                            usage_type: r.usageType || '瑗家用墊款',
+                            custom_summary: r.customSummary || null,
+                            matched_order: r.matchedOrder || null
+                        };
+                    });
 
                     // 批次寫入 Supabase (使用 upsert 避免重複 ID 報錯)
                     const { error } = await supabaseClient
@@ -581,6 +692,8 @@ async function deleteRecordInDb(id) {
 
 // 渲染表格
 function renderTable() {
+    const cashflowBody = document.getElementById('cashflow-transaction-body');
+    if (cashflowBody) cashflowBody.innerHTML = '';
     tableBody.innerHTML = '';
     
     // 更新年份與月份顯示
@@ -604,8 +717,20 @@ function renderTable() {
         return matchTab;
     });
     
-    // 依據所選欄位與排序方向對資料進行排序
-    filteredRecords.sort((a, b) => {
+    // 拆分現金流交易與實際開支交易
+    const cashflowRecords = filteredRecords.filter(r => CASHFLOW_CATEGORIES.includes(r.category));
+    const expenseRecords = filteredRecords.filter(r => !CASHFLOW_CATEGORIES.includes(r.category));
+    
+    // 1. 現金流交易排序 (依日期)
+    cashflowRecords.sort((a, b) => {
+        const valA = a.date || '';
+        const valB = b.date || '';
+        const compareResult = valA.localeCompare(valB, 'zh-TW');
+        return state.sortOrder === 'asc' ? compareResult : -compareResult;
+    });
+    
+    // 2. 實際開支交易排序 (原本的排序邏輯)
+    expenseRecords.sort((a, b) => {
         let valA, valB;
         
         switch (state.sortField) {
@@ -650,87 +775,153 @@ function renderTable() {
         return state.sortOrder === 'asc' ? compareResult : -compareResult;
     });
     
-    filteredRecords.forEach(record => {
-        const tr = document.createElement('tr');
-        
-        const bankTd = `<td><span class="bank-tag">${record.bank}</span></td>`;
-        
-        // 將 "YYYY-MM-DD" 格式化為 "MM/DD"
-        let displayDate = record.date;
-        if (record.date && record.date.includes('-')) {
-            const parts = record.date.split('-');
-            if (parts.length === 3) {
-                displayDate = `${parts[1]}/${parts[2]}`;
+    // 定義統一的分組分類選單選項 (現金流與開支選單相同)
+    function getCategoryOptionsHtml(currentCategory) {
+        return `
+            <optgroup label="💵 家庭現金流">
+                ${CASHFLOW_CATEGORIES.map(c => `<option value="${c}" ${currentCategory === c ? 'selected' : ''}>${c}</option>`).join('')}
+                <option value="ADD_NEW_CASHFLOW" style="font-weight: bold; color: #2b6cb0;">➕ 新增現金流分類...</option>
+            </optgroup>
+            <optgroup label="🛒 家庭開支">
+                ${CATEGORIES.map(c => `<option value="${c}" ${currentCategory === c ? 'selected' : ''}>${c}</option>`).join('')}
+                <option value="ADD_NEW_EXPENSE" style="font-weight: bold; color: #2c7a7b;">➕ 新增開支分類...</option>
+            </optgroup>
+        `;
+    }
+    
+    // 渲染：家庭現金流
+    if (cashflowBody) {
+        if (cashflowRecords.length === 0) {
+            cashflowBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:#a0aec0;">本月尚無現金流明細資料</td></tr>`;
+        } else {
+            cashflowRecords.forEach(record => {
+                const tr = document.createElement('tr');
+                const bankTd = `<td><span class="bank-tag" style="background:#edf2f7; color:#4a5568;">${record.bank}</span></td>`;
+                
+                let displayDate = record.date;
+                if (record.date && record.date.includes('-')) {
+                    const parts = record.date.split('-');
+                    if (parts.length === 3) displayDate = `${parts[1]}/${parts[2]}`;
+                }
+                const dateTd = `<td>${displayDate}</td>`;
+                const detailTd = `<td class="detail-text" style="font-weight: 500;">${record.details}</td>`;
+                const catTd = `<td><select class="cat-select" data-id="${record.id}">${getCategoryOptionsHtml(record.category)}</select></td>`;
+                
+                let summaryText = record.customSummary || '';
+                const itemTd = `
+                    <td>
+                        <div class="item-summary" style="display:flex; align-items:center;">
+                            <input type="text" class="summary-input ${!summaryText ? 'empty' : ''}" 
+                                   data-id="${record.id}" value="${summaryText}" placeholder="點擊輸入備註...">
+                        </div>
+                    </td>
+                `;
+                
+                const twdTd = `<td class="text-right amount ${record.amountTWD < 0 ? 'negative' : ''}" style="font-weight: 500;">${record.amountTWD}</td>`;
+                const forTd = `<td class="text-right">${record.amountForeign ? record.amountForeign + ' ' + record.currency : '-'}</td>`;
+                const actionTd = `
+                    <td style="text-align: center; white-space: nowrap;">
+                        <button class="edit-btn secondary-btn" data-id="${record.id}" title="修改此紀錄" style="padding:0.2rem; font-size:0.8rem; margin-right:4px;">✏️</button>
+                        <button class="delete-btn" data-id="${record.id}" title="刪除此紀錄">🗑️</button>
+                    </td>
+                `;
+                tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + twdTd + forTd + actionTd;
+                cashflowBody.appendChild(tr);
+            });
+        }
+    }
+    
+    // 渲染：家庭開支
+    if (expenseRecords.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:1.5rem; color:#a0aec0;">本月尚無家庭開支明細資料</td></tr>`;
+    } else {
+        expenseRecords.forEach(record => {
+            const tr = document.createElement('tr');
+            
+            const bankTd = `<td><span class="bank-tag">${record.bank}</span></td>`;
+            
+            let displayDate = record.date;
+            if (record.date && record.date.includes('-')) {
+                const parts = record.date.split('-');
+                if (parts.length === 3) displayDate = `${parts[1]}/${parts[2]}`;
             }
-        }
-        const dateTd = `<td>${displayDate}</td>`;
-        const detailTd = `<td class="detail-text">${record.details}</td>`;
-        
-        let catOptions = CATEGORIES.map(c => 
-            `<option value="${c}" ${record.category === c ? 'selected' : ''}>${c}</option>`
-        ).join('');
-        catOptions += `<option value="ADD_NEW" style="font-weight: bold; color: var(--primary-color);">➕ 新增分類...</option>`;
-        const catTd = `<td><select class="cat-select" data-id="${record.id}">${catOptions}</select></td>`;
-        
-        let countHtml = '';
-        let summaryText = record.customSummary || '';
-        if (!record.customSummary && record.matchedItems && record.matchedItems.length > 0) {
-            const count = record.matchedItems.length;
-            summaryText = record.matchedItems.slice(0, 2).map(i => i.name).join('、');
-            if (count > 2) summaryText += '...等';
-            countHtml = `<span class="item-count" style="font-size:0.75rem; background:#ebf8ff; color:#2b6cb0; padding:2px 6px; border-radius:4px; margin-right:4px; white-space:nowrap;">共 ${count} 項</span>`;
-        }
-
-        const hasInvoice = (record.customSummary && (record.customSummary.includes(' [發票]') || record.customSummary.includes(' [宗親會]')));
-        const displaySummary = summaryText.replace(' [發票]', '').replace(' [宗親會]', '');
-
-        const itemTd = `
-            <td>
-                <div class="item-summary" style="display:flex; align-items:center;">
-                    ${countHtml}
-                    <input type="text" class="summary-input ${!displaySummary ? 'empty' : ''}" 
-                           data-id="${record.id}" value="${displaySummary}" placeholder="點擊輸入摘要...">
-                </div>
-            </td>
-        `;
-
-        const invoiceTd = `
-            <td style="text-align: center;">
-                <label style="cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 0;">
-                    <input type="checkbox" class="invoice-checkbox" data-id="${record.id}" ${hasInvoice ? 'checked' : ''}>
-                </label>
-            </td>
-        `;
-
-        let usageOptions = ["瑗家用墊款", "私用", "綉家庭開支"].map(u => 
-            `<option value="${u}" ${record.usageType === u ? 'selected' : ''}>${u}</option>`
-        ).join('');
-        const usageTd = `<td><select class="usage-select" data-id="${record.id}">${usageOptions}</select></td>`;
-
-        const twdTd = `<td class="text-right amount ${record.amountTWD < 0 ? 'negative' : ''}">${record.amountTWD}</td>`;
-        const forTd = `<td class="text-right">${record.amountForeign ? record.amountForeign + ' ' + record.currency : '-'}</td>`;
-
-        const actionTd = `
-            <td style="text-align: center; white-space: nowrap;">
-                <button class="edit-btn secondary-btn" data-id="${record.id}" title="修改此紀錄" style="padding:0.2rem; font-size:0.8rem; margin-right:4px;">✏️</button>
-                <button class="delete-btn" data-id="${record.id}" title="刪除此紀錄">🗑️</button>
-            </td>
-        `;
-
-        tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + invoiceTd + usageTd + twdTd + forTd + actionTd;
-        tableBody.appendChild(tr);
-    });
+            const dateTd = `<td>${displayDate}</td>`;
+            const detailTd = `<td class="detail-text">${record.details}</td>`;
+            const catTd = `<td><select class="cat-select" data-id="${record.id}">${getCategoryOptionsHtml(record.category)}</select></td>`;
+            
+            let countHtml = '';
+            let summaryText = record.customSummary || '';
+            if (!record.customSummary && record.matchedItems && record.matchedItems.length > 0) {
+                const count = record.matchedItems.length;
+                summaryText = record.matchedItems.slice(0, 2).map(i => i.name).join('、');
+                if (count > 2) summaryText += '...等';
+                countHtml = `<span class="item-count" style="font-size:0.75rem; background:#ebf8ff; color:#2b6cb0; padding:2px 6px; border-radius:4px; margin-right:4px; white-space:nowrap;">共 ${count} 項</span>`;
+            }
+            
+            const hasInvoice = (record.customSummary && (record.customSummary.includes(' [發票]') || record.customSummary.includes(' [宗親會]')));
+            const displaySummary = summaryText.replace(' [發票]', '').replace(' [宗親會]', '');
+            const itemTd = `
+                <td>
+                    <div class="item-summary" style="display:flex; align-items:center;">
+                        ${countHtml}
+                        <input type="text" class="summary-input ${!displaySummary ? 'empty' : ''}" 
+                               data-id="${record.id}" value="${displaySummary}" placeholder="點擊輸入摘要...">
+                    </div>
+                </td>
+            `;
+            const invoiceTd = `
+                <td style="text-align: center;">
+                    <label style="cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 0;">
+                        <input type="checkbox" class="invoice-checkbox" data-id="${record.id}" ${hasInvoice ? 'checked' : ''}>
+                    </label>
+                </td>
+            `;
+            
+            let usageOptions = ["瑗家用墊款", "私用", "綉家庭開支"].map(u => 
+                `<option value="${u}" ${record.usageType === u ? 'selected' : ''}>${u}</option>`
+            ).join('');
+            const usageTd = `<td><select class="usage-select" data-id="${record.id}">${usageOptions}</select></td>`;
+            
+            const twdTd = `<td class="text-right amount ${record.amountTWD < 0 ? 'negative' : ''}">${record.amountTWD}</td>`;
+            const forTd = `<td class="text-right">${record.amountForeign ? record.amountForeign + ' ' + record.currency : '-'}</td>`;
+            
+            const actionTd = `
+                <td style="text-align: center; white-space: nowrap;">
+                    <button class="edit-btn secondary-btn" data-id="${record.id}" title="修改此紀錄" style="padding:0.2rem; font-size:0.8rem; margin-right:4px;">✏️</button>
+                    <button class="delete-btn" data-id="${record.id}" title="刪除此紀錄">🗑️</button>
+                </td>
+            `;
+            
+            tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + invoiceTd + usageTd + twdTd + forTd + actionTd;
+            tableBody.appendChild(tr);
+        });
+    }
 
     // 綁定事件
     document.querySelectorAll('.cat-select').forEach(select => {
         select.addEventListener('change', (e) => {
             const id = e.target.getAttribute('data-id');
             const val = e.target.value;
-            if (val === 'ADD_NEW') {
-                const newCat = prompt('請輸入新分類名稱：');
+            if (val === 'ADD_NEW_CASHFLOW') {
+                const newCat = prompt('請輸入新家庭現金流分類名稱：');
                 if (newCat && newCat.trim()) {
-                    CATEGORIES.push(newCat.trim());
-                    localStorage.setItem('customCategories', JSON.stringify(CATEGORIES));
+                    if (!CASHFLOW_CATEGORIES.includes(newCat.trim())) {
+                        CASHFLOW_CATEGORIES.push(newCat.trim());
+                        localStorage.setItem('customCashflowCategories', JSON.stringify(CASHFLOW_CATEGORIES));
+                    }
+                    updateRecordInDb(id, { category: newCat.trim() });
+                    renderTable();
+                } else {
+                    const record = state.bankRecords.find(r => r.id === id);
+                    e.target.value = record.category;
+                }
+            } else if (val === 'ADD_NEW_EXPENSE') {
+                const newCat = prompt('請輸入新家庭開支分類名稱：');
+                if (newCat && newCat.trim()) {
+                    if (!CATEGORIES.includes(newCat.trim())) {
+                        CATEGORIES.push(newCat.trim());
+                        localStorage.setItem('customCategories', JSON.stringify(CATEGORIES));
+                    }
                     updateRecordInDb(id, { category: newCat.trim() });
                     renderTable();
                 } else {
@@ -739,6 +930,7 @@ function renderTable() {
                 }
             } else {
                 updateRecordInDb(id, { category: val });
+                renderTable(); // 重新渲染表格，以便即時跳轉
             }
         });
     });
@@ -810,10 +1002,37 @@ function renderTable() {
             if (!record) return;
             
             state.editingId = id;
-            document.querySelector('#manual-modal h3').textContent = '✏️ 編輯隨手記帳';
             
+            // 判斷是否為現金流項目
+            const isCashflow = CASHFLOW_CATEGORIES.includes(record.category);
+            state.modalType = isCashflow ? 'cashflow' : 'expense';
+            
+            document.querySelector('#manual-modal h3').textContent = isCashflow ? '✏️ 編輯現金流記錄' : '✏️ 編輯隨手記帳 (家庭開支)';
+            
+            const usageGroup = document.getElementById('manual-usage-group');
+            const tagsGroup = document.getElementById('manual-tags-group');
             const catSelect = document.getElementById('manual-cat');
-            catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            if (isCashflow) {
+                // 隱藏歸屬與快速標籤
+                if (usageGroup) usageGroup.style.display = 'none';
+                if (tagsGroup) tagsGroup.style.display = 'none';
+                
+                // 載入現金流分類選單
+                if (catSelect) {
+                    catSelect.innerHTML = CASHFLOW_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+                }
+            } else {
+                // 顯示歸屬與快速標籤
+                if (usageGroup) usageGroup.style.display = 'block';
+                if (tagsGroup) tagsGroup.style.display = 'block';
+                
+                // 載入家庭開支分類選單
+                if (catSelect) {
+                    catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+                }
+                renderQuickTags();
+            }
             
             // 動態設定記帳月份選項
             manualMonthSelector.innerHTML = monthSelector.innerHTML;
@@ -822,10 +1041,9 @@ function renderTable() {
             document.getElementById('manual-date').value = record.date;
             document.getElementById('manual-details').value = record.details;
             document.getElementById('manual-amount').value = record.amountTWD;
-            document.getElementById('manual-cat').value = record.category;
+            if (catSelect) catSelect.value = record.category;
             document.getElementById('manual-usage').value = record.usageType;
             
-            renderQuickTags();
             document.getElementById('manual-modal').classList.add('active');
         });
     });
@@ -863,20 +1081,31 @@ function updateSummary() {
     const familySummary = {};
     let familyGrandTotal = 0;
 
+    // 初始化開支分類小計
     CATEGORIES.forEach(c => { summary[c] = 0; familySummary[c] = 0; });
+
+    // 初始化現金流小計
+    const cashflowSummary = {};
+    CASHFLOW_CATEGORIES.forEach(c => { cashflowSummary[c] = 0; });
 
     state.bankRecords.forEach(r => {
         const amt = parseFloat(r.amountTWD);
         if (!isNaN(amt) && amt !== 0) {
-            if (r.usageType === '瑗家用墊款') {
-                summary[r.category] += amt;
-                grandTotal += amt;
-                if (r.customSummary && (r.customSummary.includes(' [發票]') || r.customSummary.includes(' [宗親會]'))) {
-                    householdInvoiceTotal += amt;
+            if (CASHFLOW_CATEGORIES.includes(r.category)) {
+                // 累計家庭現金流
+                cashflowSummary[r.category] = (cashflowSummary[r.category] || 0) + amt;
+            } else {
+                // 累計家庭開支
+                if (r.usageType === '瑗家用墊款') {
+                    summary[r.category] = (summary[r.category] || 0) + amt;
+                    grandTotal += amt;
+                    if (r.customSummary && (r.customSummary.includes(' [發票]') || r.customSummary.includes(' [宗親會]'))) {
+                        householdInvoiceTotal += amt;
+                    }
+                } else if (r.usageType === '綉家庭開支') {
+                    familySummary[r.category] = (familySummary[r.category] || 0) + amt;
+                    familyGrandTotal += amt;
                 }
-            } else if (r.usageType === '綉家庭開支') {
-                familySummary[r.category] += amt;
-                familyGrandTotal += amt;
             }
         }
     });
@@ -903,7 +1132,7 @@ function updateSummary() {
             familySummaryList.innerHTML += `<div class="summary-item"><div class="summary-label"><span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>${cat}</div><div class="summary-value">NT$ ${familySummary[cat]}</div></div>`;
         }
         
-        // 新增：各家用分類的合併小計（瑗家用墊款 + 綉家庭開支）
+        // 各家用分類的合併小計（瑗家用墊款 + 綉家庭開支）
         const combinedAmt = (summary[cat] || 0) + (familySummary[cat] || 0);
         if (cat !== "未分類" && combinedAmt !== 0 && combinedSummaryList) {
             combinedSummaryList.innerHTML += `<div class="summary-item"><div class="summary-label"><span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>${cat}</div><div class="summary-value">NT$ ${combinedAmt}</div></div>`;
@@ -917,6 +1146,32 @@ function updateSummary() {
     if (fGT) fGT.textContent = `NT$ ${familyGrandTotal}`;
     const cGT = document.getElementById('combined-grand-total');
     if (cGT) cGT.textContent = `NT$ ${grandTotal + familyGrandTotal}`;
+
+    // 更新家庭現金流統計列
+    const cashflowSummaryBar = document.getElementById('cashflow-summary-bar');
+    if (cashflowSummaryBar) {
+        let barHtml = '<span style="margin-right: 0.5rem; color: #2b6cb0; font-weight: bold;">📊 當月現金流統計：</span>';
+        let items = [];
+        let cashflowTotal = 0;
+        
+        CASHFLOW_CATEGORIES.forEach(cat => {
+            const amt = cashflowSummary[cat] || 0;
+            if (amt !== 0) {
+                cashflowTotal += amt;
+                items.push(`<span style="background: white; border: 1px solid #bee3f8; padding: 2px 8px; border-radius: 4px; display: inline-block;">${cat}: <strong style="${amt < 0 ? 'color: #e53e3e;' : 'color: #2b6cb0;'}">NT$ ${amt.toLocaleString()}</strong></span>`);
+            }
+        });
+        
+        if (items.length === 0) {
+            barHtml += '<span style="color: #a0aec0; font-weight: normal;">本月尚無現金流數據</span>';
+        } else {
+            // 加入淨流動合計小計。入帳為負（流入），支出為正。
+            const netLabel = cashflowTotal < 0 ? '剩餘可運用資金' : (cashflowTotal > 0 ? '淨資金流出' : '現金流相抵');
+            const totalHtml = `<span style="background: #2b6cb0; color: white; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-left: auto;">${netLabel}：<strong>NT$ ${Math.abs(cashflowTotal).toLocaleString()}</strong></span>`;
+            barHtml += items.join(' ') + totalHtml;
+        }
+        cashflowSummaryBar.innerHTML = barHtml;
+    }
 
     // 更新年度發票合計
     updateYearInvoiceTotal();
@@ -997,27 +1252,67 @@ function renderQuickTags() {
 
 // 手動新增視窗
 const manualModal = document.getElementById('manual-modal');
-addManualBtn.addEventListener('click', () => {
-    state.editingId = null;
-    document.querySelector('#manual-modal h3').textContent = '➕ 雲端隨手記帳';
-    
-    const catSelect = document.getElementById('manual-cat');
-    catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
-    
-    // 動態設定記帳月份選項
-    manualMonthSelector.innerHTML = monthSelector.innerHTML;
-    manualMonthSelector.value = state.currentMonth;
-    
-    document.getElementById('manual-details').value = "";
-    document.getElementById('manual-amount').value = "";
-    document.getElementById('manual-usage').value = "瑗家用墊款";
-    
-    // 根據記帳月份帶入預設日期（最新一期為當日，其餘為該月 1 號）
-    updateManualDateByDefault(state.currentMonth);
-    
-    renderQuickTags();
-    manualModal.classList.add('active');
-});
+// 點擊新增現金流
+if (addCashflowBtn) {
+    addCashflowBtn.addEventListener('click', () => {
+        state.editingId = null;
+        state.modalType = 'cashflow';
+        document.querySelector('#manual-modal h3').textContent = '💵 新增現金流記錄';
+        
+        // 隱藏開支專用欄位與快速標籤
+        const usageGroup = document.getElementById('manual-usage-group');
+        const tagsGroup = document.getElementById('manual-tags-group');
+        if (usageGroup) usageGroup.style.display = 'none';
+        if (tagsGroup) tagsGroup.style.display = 'none';
+        
+        // 分類選單只載入現金流分類
+        const catSelect = document.getElementById('manual-cat');
+        if (catSelect) {
+            catSelect.innerHTML = CASHFLOW_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+        
+        // 重設記帳選單與預設值
+        manualMonthSelector.innerHTML = monthSelector.innerHTML;
+        manualMonthSelector.value = state.currentMonth;
+        document.getElementById('manual-details').value = "";
+        document.getElementById('manual-amount').value = "";
+        
+        updateManualDateByDefault(state.currentMonth);
+        manualModal.classList.add('active');
+    });
+}
+
+// 點擊隨手記開支
+if (addExpenseBtn) {
+    addExpenseBtn.addEventListener('click', () => {
+        state.editingId = null;
+        state.modalType = 'expense';
+        document.querySelector('#manual-modal h3').textContent = '🛒 雲端隨手記帳 (家庭開支)';
+        
+        // 顯示開支專用欄位與快速標籤
+        const usageGroup = document.getElementById('manual-usage-group');
+        const tagsGroup = document.getElementById('manual-tags-group');
+        if (usageGroup) usageGroup.style.display = 'block';
+        if (tagsGroup) tagsGroup.style.display = 'block';
+        
+        // 分類選單只載入開支分類
+        const catSelect = document.getElementById('manual-cat');
+        if (catSelect) {
+            catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+        
+        // 重設記帳選單與預設值
+        manualMonthSelector.innerHTML = monthSelector.innerHTML;
+        manualMonthSelector.value = state.currentMonth;
+        document.getElementById('manual-details').value = "";
+        document.getElementById('manual-amount').value = "";
+        document.getElementById('manual-usage').value = "瑗家用墊款";
+        
+        updateManualDateByDefault(state.currentMonth);
+        renderQuickTags();
+        manualModal.classList.add('active');
+    });
+}
 
 document.getElementById('cancel-manual-btn').addEventListener('click', () => {
     manualModal.classList.remove('active');
@@ -1025,10 +1320,13 @@ document.getElementById('cancel-manual-btn').addEventListener('click', () => {
 
 document.getElementById('confirm-manual-btn').addEventListener('click', async () => {
     const date = document.getElementById('manual-date').value.trim();
-    const details = document.getElementById('manual-details').value.trim();
+    let details = document.getElementById('manual-details').value.trim();
+    if (details === '生活費已撥款') {
+        details = '生活費入帳（待確認）';
+    }
     const amountStr = document.getElementById('manual-amount').value.trim();
     const cat = document.getElementById('manual-cat').value;
-    const usage = document.getElementById('manual-usage').value;
+    const usage = state.modalType === 'cashflow' ? '私用' : document.getElementById('manual-usage').value;
     const selectedMonth = document.getElementById('manual-month').value;
     
     let amountTWD = NaN;
@@ -1072,7 +1370,7 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
                 if (confirm(`✅ 修改成功！\n此筆帳務已被移至 ${y} 年 ${mon} 月。\n\n是否要切換到該月份查看？`)) {
                     state.currentMonth = selectedMonth;
                     monthSelector.value = selectedMonth;
-                    localStorage.setItem('lastSelectedMonth', state.currentMonth);
+                    sessionStorage.setItem('lastSelectedMonth', state.currentMonth);
                     const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
                     state.ecommerceOrders = savedOrders ? JSON.parse(savedOrders) : [];
                     resetMatchButton();
@@ -1121,7 +1419,7 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
                 if (confirm(`✅ 儲存成功！\n此筆帳務已歸檔至 ${y} 年 ${mon} 月。\n\n是否要切換到該月份查看？`)) {
                     state.currentMonth = selectedMonth;
                     monthSelector.value = selectedMonth;
-                    localStorage.setItem('lastSelectedMonth', state.currentMonth);
+                    sessionStorage.setItem('lastSelectedMonth', state.currentMonth);
                     const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
                     state.ecommerceOrders = savedOrders ? JSON.parse(savedOrders) : [];
                     resetMatchButton();
