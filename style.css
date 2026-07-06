@@ -772,3 +772,38 @@ body {
 #report-table tbody tr:hover {
     background-color: #f7fafc;
 }
+
+/* ==========================================================================
+   展開與收合區塊樣式
+   ========================================================================== */
+.collapse-trigger {
+    cursor: pointer;
+    background: #edf2f7;
+    color: #4a5568;
+    border: 1px solid #cbd5e0;
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    line-height: 1;
+}
+
+.collapse-trigger:hover {
+    background: #cbd5e0;
+    color: #2d3748;
+}
+
+/* 當月事件紀錄收合 */
+.event-notes-container.collapsed #event-notes {
+    display: none !important;
+}
+
+/* 現金流明細區塊收合 */
+.cashflow-section.collapsed .table-container,
+.cashflow-section.collapsed #add-cashflow-btn {
+    display: none !important;
+}

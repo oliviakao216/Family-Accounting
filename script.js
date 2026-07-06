@@ -406,6 +406,26 @@ async function init() {
         });
     }
 
+    // 綁定當月事件紀錄的展開收合按鈕
+    const toggleEventNotesBtn = document.getElementById('toggle-event-notes-btn');
+    const eventNotesContainer = document.querySelector('.event-notes-container');
+    if (toggleEventNotesBtn && eventNotesContainer) {
+        toggleEventNotesBtn.addEventListener('click', () => {
+            const isCollapsed = eventNotesContainer.classList.toggle('collapsed');
+            toggleEventNotesBtn.textContent = isCollapsed ? '展開 ▼' : '收合 ▲';
+        });
+    }
+
+    // 綁定現金流明細的展開收合按鈕
+    const toggleCashflowBtn = document.getElementById('toggle-cashflow-btn');
+    const cashflowSection = document.querySelector('.cashflow-section');
+    if (toggleCashflowBtn && cashflowSection) {
+        toggleCashflowBtn.addEventListener('click', () => {
+            const isCollapsed = cashflowSection.classList.toggle('collapsed');
+            toggleCashflowBtn.textContent = isCollapsed ? '展開 ▼' : '收合 ▲';
+        });
+    }
+
     await loadData();
 }
 
@@ -519,7 +539,7 @@ async function loadData() {
         // 2. 篩選出事件紀錄特殊交易並渲染至事件紀錄文字區
         const noteRecord = cleanedData.find(r => r.id === noteId);
         const eventNotesTextarea = document.getElementById('event-notes');
-        const notesVal = noteRecord ? (noteRecord.custom_summary || '') : '';
+        const notesVal = noteRecord ? (noteRecord.customSummary || '') : '';
         if (eventNotesTextarea) {
             eventNotesTextarea.value = notesVal;
         }

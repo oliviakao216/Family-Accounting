@@ -135,24 +135,30 @@
                     </div>
                 </div>
                 <!-- 事件紀錄區塊 -->
-                <div class="event-notes-container print-hidden" style="margin-bottom: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative;">
+                <div class="event-notes-container collapsed print-hidden" style="margin-bottom: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                         <label for="event-notes" style="font-weight: bold; color: #2d3748; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; margin: 0;">
                             📝 當月事件紀錄 <span style="font-size: 0.75rem; color: #a0aec0; font-weight: normal;">(將自動同步至雲端)</span>
                         </label>
-                        <span id="event-notes-status" style="font-size: 0.75rem; color: #38a169; opacity: 0; transition: opacity 0.3s; font-weight: bold;">🟢 已同步至雲端</span>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span id="event-notes-status" style="font-size: 0.75rem; color: #38a169; opacity: 0; transition: opacity 0.3s; font-weight: bold;">🟢 已同步至雲端</span>
+                            <button id="toggle-event-notes-btn" class="collapse-trigger">展開 ▼</button>
+                        </div>
                     </div>
                     <textarea id="event-notes" placeholder="在此輸入本月特殊事件紀錄（例如：今天二姐買了冰箱，但錢誰出不知道，帳怎麼算不知道...）" 
                               style="width: 100%; border: 1px solid #cbd5e0; border-radius: 6px; padding: 0.6rem; font-size: 0.9rem; line-height: 1.5; resize: vertical; min-height: 72px; max-height: 120px; overflow-y: auto; outline: none; box-sizing: border-box; display: block; font-family: inherit; background-color: #ffffff;"
                               rows="3"></textarea>
                 </div>
                  <!-- 💵 家庭現金流明細區塊 -->
-                <div class="cashflow-section" style="margin-bottom: 2rem;">
+                <div class="cashflow-section collapsed" style="margin-bottom: 2rem;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-left: 4px solid #3182ce; padding-left: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                         <h3 style="margin: 0; color: #2b6cb0; font-size: 1.15rem; font-weight: bold;">💵 家庭現金流明細 <span style="font-size: 0.8rem; color: #718096; font-weight: normal; margin-left: 8px;">(生活費入帳、代墊償付款等，不計入家庭總支出)</span></h3>
-                        <button id="add-cashflow-btn" class="primary-btn" style="padding: 0.3rem 0.8rem; font-size: 0.85rem; background: #3182ce; border-color: #2b6cb0; margin: 0;">
-                            ➕ 新增現金流
-                        </button>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <button id="add-cashflow-btn" class="primary-btn" style="padding: 0.3rem 0.8rem; font-size: 0.85rem; background: #3182ce; border-color: #2b6cb0; margin: 0;">
+                                ➕ 新增現金流
+                            </button>
+                            <button id="toggle-cashflow-btn" class="collapse-trigger">展開 ▼</button>
+                        </div>
                     </div>
                     <div class="table-container" style="margin-bottom: 0.75rem; overflow-x: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                         <table class="transaction-table">
