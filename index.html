@@ -41,6 +41,13 @@
                 <button id="refresh-btn" class="secondary-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; background: #e2e8f0; color: #4a5568; border: none; cursor: pointer;" title="更新頁面">
                     <span style="font-size: 1.1rem;">🔄</span>
                 </button>
+                
+                <!-- 弱化為小圓圈按鈕的匯入與比對功能 -->
+                <button id="import-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; background: #e2e8f0; color: #4a5568; border: none; cursor: pointer; font-size: 0.9rem;" title="匯入資料檔 (JSON)">匯</button>
+                <input type="file" id="file-upload" accept=".json" style="display: none;">
+                
+                <button id="run-match-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; background: #e2e8f0; color: #4a5568; border: none; cursor: pointer; font-size: 0.9rem;" title="執行自動比對">自</button>
+
                 <button id="show-report-btn" class="primary-btn" style="background-color: #6b46c1; border-color: #553c9a; padding: 0.5rem 1rem; font-size: 0.9rem;">
                     <span class="icon">📊</span> 年度報表
                 </button>
@@ -54,17 +61,6 @@
                 </button>
                 
                 <button id="bank-total-btn" style="background: transparent; border: none; color: #a0aec0; cursor: pointer; font-size: 1.2rem; padding: 0.2rem; min-width: 20px; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px;" title="計算各銀行總計">.</button>
-                
-                <div class="desktop-only-btns" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <button id="import-btn" class="secondary-btn" style="background-color: #ecc94b; color: #744210;">
-                        <span class="icon">📂</span> 匯入資料檔 (JSON)
-                    </button>
-                    <input type="file" id="file-upload" accept=".json" style="display: none;">
-                    
-                    <button id="run-match-btn" class="primary-btn">
-                        <span class="icon">🔍</span> 執行自動比對
-                    </button>
-                </div>
             </div>
         </header>
 

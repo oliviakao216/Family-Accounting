@@ -1437,7 +1437,7 @@ function updateSummary() {
     for (const u in usageTotals) {
         if (u === '私用') continue; // 私用不計入左側小計
         
-        const isExpenseType = u.includes('開支');
+        const isExpenseType = u.includes('開支') || u.includes('瑄') || u.includes('綉');
         const uTotal = usageTotals[u].grandTotal;
         
         // 產生該項目的分類列表 HTML
