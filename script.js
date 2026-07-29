@@ -30,6 +30,178 @@ if (savedCashflowCat) {
     });
 }
 
+// 全域狀態中的 USAGES 陣列與載入
+let USAGES = ["瑗家用墊款", "私用", "綉開支", "瑄開支"];
+const savedUsages = localStorage.getItem("customUsages");
+if (savedUsages) {
+    const parsed = JSON.parse(savedUsages);
+    parsed.forEach(u => {
+        if (!USAGES.includes(u)) USAGES.push(u);
+    });
+}
+
+// 常用消費明細與快速標籤（拿掉 UE, PF）
+let QUICK_TAGS = ["水費", "電費", "電話費", "櫟安司機揹錢", "櫟安交通費", "房屋稅", "地價稅", "國有財產局地租", "外看薪水", "外看餐費", "勞保費", "健保費", "餐食", "藥品", "生活用品", "生活費入帳"];
+const savedTags = localStorage.getItem("customQuickTags");
+if (savedTags) {
+    try {
+        const parsed = JSON.parse(savedTags);
+        parsed.forEach(t => {
+            if (t !== 'UE' && t !== 'PF' && !QUICK_TAGS.includes(t)) {
+                QUICK_TAGS.push(t);
+            }
+        });
+    } catch(e) {}
+}
+
+// 動態渲染歸屬選單選項的 HTML
+function renderUsageSelectOptions(currentValue) {
+    let optionsHtml = USAGES.map(u => `<option value="${u}" ${currentValue === u ? 'selected' : ''}>${u}</option>`).join('');
+    optionsHtml += `<option value="ADD_NEW_USAGE" style="font-weight: bold; color: #2c5282;">➕ 新增歸屬...</option>`;
+    optionsHtml += `<option value="MANAGE_USAGES" style="font-weight: bold; color: #744210;">⚙️ 管理/修改歸屬...</option>`;
+    return optionsHtml;
+}
+
+// 動態渲染右側歸屬頁籤
+function renderUsageTabs() {
+    const tabsContainer = document.getElementById('usage-tabs');
+    if (!tabsContainer) return;
+    
+    let html = `<button class="tab-btn ${state.currentTab === 'all' ? 'active' : ''}" data-tab="all">全部</button>`;
+    USAGES.forEach(u => {
+        html += `<button class="tab-btn ${state.currentTab === u ? 'active' : ''}" data-tab="${u}">${u}</button>`;
+    });
+    
+    tabsContainer.innerHTML = html;
+    
+    // 重新綁定事件
+    tabsContainer.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            tabsContainer.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            state.currentTab = e.target.getAttribute('data-tab');
+            renderTable();
+            updateSummary();
+        });
+    });
+}
+
+// 管理/修改歸屬名稱的對話框與雲端批次更名邏輯
+async function handleManageUsages(recordId, selectElement) {
+    let promptMsg = "目前的所有歸屬項目如下：\n";
+    USAGES.forEach((u, i) => {
+        promptMsg += `${i + 1}. ${u}\n`;
+    });
+    promptMsg += "\n請輸入您想要【修改名稱】的歸屬項目編號 (如 1) 或完整名稱：";
+    
+    const choice = prompt(promptMsg);
+    if (!choice) {
+        if (recordId) {
+            const r = state.bankRecords.find(item => item.id === recordId);
+            if (r) selectElement.value = r.usageType;
+        } else {
+            selectElement.value = "瑗家用墊款";
+        }
+        return;
+    }
+    
+    let oldName = "";
+    const idx = parseInt(choice.trim(), 10);
+    if (!isNaN(idx) && idx >= 1 && idx <= USAGES.length) {
+        oldName = USAGES[idx - 1];
+    } else {
+        const found = USAGES.find(u => u === choice.trim());
+        if (found) oldName = found;
+    }
+    
+    if (!oldName) {
+        alert("找不到您輸入的項目，操作已取消。");
+        if (recordId) {
+            const r = state.bankRecords.find(item => item.id === recordId);
+            if (r) selectElement.value = r.usageType;
+        } else {
+            selectElement.value = "瑗家用墊款";
+        }
+        return;
+    }
+    
+    if (oldName === "私用" || oldName === "瑗家用墊款") {
+        alert(`系統核心項目「${oldName}」不可修改。`);
+        if (recordId) {
+            const r = state.bankRecords.find(item => item.id === recordId);
+            if (r) selectElement.value = r.usageType;
+        } else {
+            selectElement.value = "瑗家用墊款";
+        }
+        return;
+    }
+    
+    const newName = prompt(`請輸入「${oldName}」的新名稱：`);
+    if (!newName || !newName.trim()) {
+        alert("名稱不可為空，操作已取消。");
+        if (recordId) {
+            const r = state.bankRecords.find(item => item.id === recordId);
+            if (r) selectElement.value = r.usageType;
+        } else {
+            selectElement.value = "瑗家用墊款";
+        }
+        return;
+    }
+    
+    const cleanNewName = newName.trim();
+    if (USAGES.includes(cleanNewName)) {
+        alert("該名稱已存在！");
+        if (recordId) {
+            const r = state.bankRecords.find(item => item.id === recordId);
+            if (r) selectElement.value = r.usageType;
+        } else {
+            selectElement.value = "瑗家用墊款";
+        }
+        return;
+    }
+    
+    const index = USAGES.indexOf(oldName);
+    if (index !== -1) {
+        USAGES[index] = cleanNewName;
+        localStorage.setItem('customUsages', JSON.stringify(USAGES));
+    }
+    
+    if (confirm(`是否要同步將雲端資料庫中，所有歸屬為「${oldName}」的歷史交易紀錄一次性更名為「${cleanNewName}」？\n（這能避免舊帳務分析時出現分類斷層）`)) {
+        try {
+            const { error } = await supabaseClient
+                .from('transactions')
+                .update({ usage_type: cleanNewName })
+                .eq('usage_type', oldName);
+                
+            if (error) throw error;
+            
+            state.bankRecords.forEach(r => {
+                if (r.usageType === oldName) {
+                    r.usageType = cleanNewName;
+                }
+            });
+            
+            alert(`✅ 同步修改完成！已更新歷史資料中的歸屬名稱。`);
+        } catch (err) {
+            console.error("同步失敗:", err.message);
+            alert(`❌ 雲端更新失敗: ${err.message}`);
+        }
+    } else {
+        if (recordId) {
+            await updateRecordInDb(recordId, { usageType: cleanNewName });
+        }
+    }
+    
+    renderUsageTabs();
+    renderTable();
+    updateSummary();
+    
+    if (!recordId) {
+        selectElement.innerHTML = renderUsageSelectOptions(cleanNewName);
+        selectElement.value = cleanNewName;
+    }
+}
+
 // 全域狀態
 let lastSavedNotes = null; // 用於事件紀錄防重送
 let state = {
@@ -272,16 +444,46 @@ function resetMatchButton() {
 
 // 初始化
 async function init() {
-    // 綁定頁籤事件
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            state.currentTab = e.target.getAttribute('data-tab');
-            renderTable();
-            updateSummary();
+    // 渲染並綁定頁籤事件
+    renderUsageTabs();
+
+    // 綁定手動新增 Modal 裡面的歸屬下拉選單 change 事件
+    const manualUsageSelector = document.getElementById('manual-usage');
+    if (manualUsageSelector) {
+        manualUsageSelector.addEventListener('change', async (e) => {
+            const val = e.target.value;
+            if (val === 'ADD_NEW_USAGE') {
+                const newUsage = prompt('請輸入新歸屬項目名稱：');
+                if (newUsage && newUsage.trim()) {
+                    const cleanUsage = newUsage.trim();
+                    if (!USAGES.includes(cleanUsage)) {
+                        USAGES.push(cleanUsage);
+                        localStorage.setItem('customUsages', JSON.stringify(USAGES));
+                    }
+                    renderUsageTabs();
+                    manualUsageSelector.innerHTML = renderUsageSelectOptions(cleanUsage);
+                    manualUsageSelector.value = cleanUsage;
+                } else {
+                    manualUsageSelector.value = "瑗家用墊款";
+                }
+            } else if (val === 'MANAGE_USAGES') {
+                await handleManageUsages(null, manualUsageSelector);
+            }
         });
-    });
+    }
+
+    // 消費明細輸入框失去焦點 (focus 改變) 時，若為新內容則自動新增為常用快速標籤
+    const detailsInput = document.getElementById('manual-details');
+    if (detailsInput) {
+        detailsInput.addEventListener('blur', (e) => {
+            const val = e.target.value.trim();
+            if (val && !QUICK_TAGS.includes(val) && val !== '生活費入帳（待確認）' && val !== '月度事件紀錄') {
+                QUICK_TAGS.push(val);
+                localStorage.setItem('customQuickTags', JSON.stringify(QUICK_TAGS));
+                renderQuickTags();
+            }
+        });
+    }
 
     // 初始化月份選擇器
     await initMonthSelector();
@@ -310,7 +512,7 @@ async function init() {
                 return;
             }
             
-            // 建立統計結構：大類為 瑗 / 綉，小類為各銀行
+            // 建立統計結構：大類為 瑗 / 綉 / 瑄，小類為各銀行
             const totals = {
                 yuan: {
                     label: "瑗",
@@ -321,6 +523,11 @@ async function init() {
                     label: "綉",
                     banks: {},
                     subtotal: 0
+                },
+                xuan: {
+                    label: "瑄",
+                    banks: {},
+                    subtotal: 0
                 }
             };
             
@@ -328,10 +535,12 @@ async function init() {
                 const bankName = r.bank || "未指定";
                 const amt = parseFloat(r.amountTWD) || 0;
                 
-                // 區分大類 (瑗家用墊款與私用歸為瑗，其餘綉家庭開支歸為綉)
+                // 區分大類 (瑗家用墊款與私用歸為瑗，綉歸為綉，瑄歸為瑄)
                 let categoryKey = "yuan";
-                if (r.usageType === '綉家庭開支') {
+                if (r.usageType === '綉開支' || r.usageType === '綉家庭開支') {
                     categoryKey = "xiu";
+                } else if (r.usageType === '瑄開支') {
+                    categoryKey = "xuan";
                 }
                 
                 // 累加小類 (銀行) 金額
@@ -363,6 +572,16 @@ async function init() {
                 }
                 message += `小計: NT$ ${totals.xiu.subtotal.toLocaleString()}\n\n`;
                 grandTotal += totals.xiu.subtotal;
+            }
+
+            // 呈現「瑄」的統計結果
+            if (totals.xuan.subtotal !== 0 || Object.keys(totals.xuan.banks).length > 0) {
+                message += `【 瑄 】\n`;
+                for (const bank in totals.xuan.banks) {
+                    message += `• ${bank}: NT$ ${totals.xuan.banks[bank].toLocaleString()}\n`;
+                }
+                message += `小計: NT$ ${totals.xuan.subtotal.toLocaleString()}\n\n`;
+                grandTotal += totals.xuan.subtotal;
             }
             
             message += `總計金額: NT$ ${grandTotal.toLocaleString()}`;
@@ -503,6 +722,21 @@ async function loadData() {
                 }
             }
             
+            // 雲端舊資料清洗對應為 UE 與 PF
+            if (details) {
+                const lowerD = details.toLowerCase();
+                let cleanD = details;
+                if (lowerD.includes('優步') || lowerD.includes('優食') || lowerD.includes('ubereat')) {
+                    cleanD = 'UE';
+                } else if (lowerD.includes('foodpanda') || lowerD.includes('fp') || lowerD.includes('pf')) {
+                    cleanD = 'PF';
+                }
+                if (cleanD !== details) {
+                    details = cleanD;
+                    hasChanged = true;
+                }
+            }
+            
             if (hasChanged) {
                 // 背景非同步更新 Supabase 雲端資料庫
                 updateRecordInDb(r.id, { details: details, category: category });
@@ -529,7 +763,7 @@ async function loadData() {
                 amountForeign: r.amount_foreign,
                 currency: r.currency,
                 category: category,
-                usageType: r.usage_type,
+                usageType: r.usage_type === '綉家庭開支' ? '綉開支' : r.usage_type,
                 customSummary: customSum,
                 matchedOrder: r.matched_order,
                 matchedItems: matchedOrd ? matchedOrd.items : []
@@ -695,6 +929,7 @@ async function updateRecordInDb(id, updates) {
     if (updates.amountTWD !== undefined) dbUpdates.amount_twd = updates.amountTWD;
     if (updates.matchedOrder !== undefined) dbUpdates.matched_order = updates.matchedOrder;
     if (updates.month !== undefined) dbUpdates.month = updates.month;
+    if (updates.bank !== undefined) dbUpdates.bank = updates.bank;
     
     await supabaseClient.from('transactions').update(dbUpdates).eq('id', id);
 }
@@ -728,7 +963,14 @@ function renderTable() {
     
     let filteredRecords = state.bankRecords.filter(record => {
         // 基本過濾 (按頁籤)
-        const matchTab = state.currentTab === 'all' || record.usageType === state.currentTab;
+        let matchTab = false;
+        if (state.currentTab === 'all') {
+            matchTab = true;
+        } else if (state.currentTab === '家庭開支') {
+            matchTab = (record.usageType === '綉開支' || record.usageType === '瑄開支' || record.usageType === '綉家庭開支');
+        } else {
+            matchTab = (record.usageType === state.currentTab);
+        }
         
         // 如果是在列印中，且勾選了排除私用，則強制排除歸屬為「私用」的明細
         if (state.isPrinting && state.excludePrivate && record.usageType === '私用') {
@@ -812,7 +1054,7 @@ function renderTable() {
     // 渲染：家庭現金流
     if (cashflowBody) {
         if (cashflowRecords.length === 0) {
-            cashflowBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:#a0aec0;">本月尚無現金流明細資料</td></tr>`;
+            cashflowBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:#a0aec0;">本月尚無現金流明細資料</td></tr>`;
         } else {
             cashflowRecords.forEach(record => {
                 const tr = document.createElement('tr');
@@ -838,14 +1080,13 @@ function renderTable() {
                 `;
                 
                 const twdTd = `<td class="text-right amount ${record.amountTWD < 0 ? 'negative' : ''}" style="font-weight: 500;">${record.amountTWD}</td>`;
-                const forTd = `<td class="text-right">${record.amountForeign ? record.amountForeign + ' ' + record.currency : '-'}</td>`;
                 const actionTd = `
                     <td style="text-align: center; white-space: nowrap;">
                         <button class="edit-btn secondary-btn" data-id="${record.id}" title="修改此紀錄" style="padding:0.2rem; font-size:0.8rem; margin-right:4px;">✏️</button>
                         <button class="delete-btn" data-id="${record.id}" title="刪除此紀錄">🗑️</button>
                     </td>
                 `;
-                tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + twdTd + forTd + actionTd;
+                tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + twdTd + actionTd;
                 cashflowBody.appendChild(tr);
             });
         }
@@ -853,7 +1094,7 @@ function renderTable() {
     
     // 渲染：家庭開支
     if (expenseRecords.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:1.5rem; color:#a0aec0;">本月尚無家庭開支明細資料</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1.5rem; color:#a0aec0;">本月尚無家庭開支明細資料</td></tr>`;
     } else {
         expenseRecords.forEach(record => {
             const tr = document.createElement('tr');
@@ -897,13 +1138,8 @@ function renderTable() {
                 </td>
             `;
             
-            let usageOptions = ["瑗家用墊款", "私用", "綉家庭開支"].map(u => 
-                `<option value="${u}" ${record.usageType === u ? 'selected' : ''}>${u}</option>`
-            ).join('');
-            const usageTd = `<td><select class="usage-select" data-id="${record.id}">${usageOptions}</select></td>`;
-            
+            const usageTd = `<td><select class="usage-select" data-id="${record.id}">${renderUsageSelectOptions(record.usageType)}</select></td>`;
             const twdTd = `<td class="text-right amount ${record.amountTWD < 0 ? 'negative' : ''}">${record.amountTWD}</td>`;
-            const forTd = `<td class="text-right">${record.amountForeign ? record.amountForeign + ' ' + record.currency : '-'}</td>`;
             
             const actionTd = `
                 <td style="text-align: center; white-space: nowrap;">
@@ -912,7 +1148,7 @@ function renderTable() {
                 </td>
             `;
             
-            tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + invoiceTd + usageTd + twdTd + forTd + actionTd;
+            tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + invoiceTd + usageTd + twdTd + actionTd;
             tableBody.appendChild(tr);
         });
     }
@@ -956,10 +1192,32 @@ function renderTable() {
     });
 
     document.querySelectorAll('.usage-select').forEach(select => {
-        select.addEventListener('change', (e) => {
+        select.addEventListener('change', async (e) => {
             const id = e.target.getAttribute('data-id');
-            updateRecordInDb(id, { usageType: e.target.value });
-            if (state.currentTab !== 'all') renderTable();
+            const val = e.target.value;
+            
+            if (val === 'ADD_NEW_USAGE') {
+                const newUsage = prompt('請輸入新歸屬項目名稱：');
+                if (newUsage && newUsage.trim()) {
+                    const cleanUsage = newUsage.trim();
+                    if (!USAGES.includes(cleanUsage)) {
+                        USAGES.push(cleanUsage);
+                        localStorage.setItem('customUsages', JSON.stringify(USAGES));
+                    }
+                    await updateRecordInDb(id, { usageType: cleanUsage });
+                    renderUsageTabs();
+                    renderTable();
+                } else {
+                    const record = state.bankRecords.find(r => r.id === id);
+                    e.target.value = record.usageType;
+                }
+            } else if (val === 'MANAGE_USAGES') {
+                await handleManageUsages(id, e.target);
+            } else {
+                await updateRecordInDb(id, { usageType: val });
+                if (state.currentTab !== 'all') renderTable();
+                else updateSummary();
+            }
         });
     });
 
@@ -1059,10 +1317,26 @@ function renderTable() {
             manualMonthSelector.value = record.month || state.currentMonth;
             
             document.getElementById('manual-date').value = record.date;
-            document.getElementById('manual-details').value = record.details;
+            
+            // 填入消費明細 (輸入框)
+            const detailsVal = record.details || "";
+            const detailsInput = document.getElementById('manual-details');
+            if (detailsInput) {
+                detailsInput.value = detailsVal;
+            }
+            
             document.getElementById('manual-amount').value = record.amountTWD;
             if (catSelect) catSelect.value = record.category;
-            document.getElementById('manual-usage').value = record.usageType;
+            
+            // 載入付款管道
+            document.getElementById('manual-bank').value = record.bank || "現金";
+            
+            // 動態填入與渲染歸屬選單選項
+            const usageSelect = document.getElementById('manual-usage');
+            if (usageSelect) {
+                usageSelect.innerHTML = renderUsageSelectOptions(record.usageType);
+                usageSelect.value = record.usageType;
+            }
             
             document.getElementById('manual-modal').classList.add('active');
         });
@@ -1095,14 +1369,19 @@ function renderTable() {
 }
 // 更新小計
 function updateSummary() {
-    const summary = {};
-    let grandTotal = 0;
     let householdInvoiceTotal = 0;
-    const familySummary = {};
-    let familyGrandTotal = 0;
 
-    // 初始化開支分類小計
-    CATEGORIES.forEach(c => { summary[c] = 0; familySummary[c] = 0; });
+    // 初始化所有 USAGES 的統計結構
+    const usageTotals = {};
+    USAGES.forEach(u => {
+        usageTotals[u] = {
+            grandTotal: 0,
+            categories: {}
+        };
+        CATEGORIES.forEach(c => {
+            usageTotals[u].categories[c] = 0;
+        });
+    });
 
     // 初始化現金流小計
     const cashflowSummary = {};
@@ -1115,57 +1394,156 @@ function updateSummary() {
                 // 累計家庭現金流
                 cashflowSummary[r.category] = (cashflowSummary[r.category] || 0) + amt;
             } else {
-                // 累計家庭開支
-                if (r.usageType === '瑗家用墊款') {
-                    summary[r.category] = (summary[r.category] || 0) + amt;
-                    grandTotal += amt;
-                    if (r.customSummary && (r.customSummary.includes(' [發票]') || r.customSummary.includes(' [宗親會]'))) {
-                        householdInvoiceTotal += amt;
+                // 自動將舊雲端資料名稱 '綉家庭開支' 轉換為 '綉開支'
+                let usageType = r.usageType;
+                if (usageType === '綉家庭開支') usageType = '綉開支';
+                
+                // 如果 usageTotals 中沒有這個歸屬（可能是歷史資料裡有，但 USAGES 裡還沒有），動態補上
+                if (!usageTotals[usageType]) {
+                    usageTotals[usageType] = { grandTotal: 0, categories: {} };
+                    CATEGORIES.forEach(c => { usageTotals[usageType].categories[c] = 0; });
+                    if (!USAGES.includes(usageType)) {
+                        USAGES.push(usageType);
+                        localStorage.setItem('customUsages', JSON.stringify(USAGES));
+                        renderUsageTabs();
                     }
-                } else if (r.usageType === '綉家庭開支') {
-                    familySummary[r.category] = (familySummary[r.category] || 0) + amt;
-                    familyGrandTotal += amt;
+                }
+                
+                usageTotals[usageType].categories[r.category] = (usageTotals[usageType].categories[r.category] || 0) + amt;
+                usageTotals[usageType].grandTotal += amt;
+                
+                // 宗親會發票特殊累計 (限瑗家用墊款)
+                if (usageType === '瑗家用墊款' && r.customSummary && (r.customSummary.includes(' [發票]') || r.customSummary.includes(' [宗親會]'))) {
+                    householdInvoiceTotal += amt;
                 }
             }
         }
     });
 
-    summaryList.innerHTML = '';
-    const familySummaryList = document.getElementById('family-summary-list');
-    if (familySummaryList) familySummaryList.innerHTML = '';
-    
-    // 獲取各家用分類合併小計的容器
-    const combinedSummaryList = document.getElementById('combined-summary-list');
-    if (combinedSummaryList) combinedSummaryList.innerHTML = '';
-    
     const colors = {
         "食": "var(--cat-food)", "交通": "var(--cat-transport)", 
         "醫療": "var(--cat-medical)", "家用": "var(--cat-household)",
         "母親照顧": "var(--cat-mother)", "未分類": "var(--cat-other)"
     };
 
-    CATEGORIES.forEach(cat => {
-        if (cat !== "未分類" && summary[cat] !== 0) {
-            summaryList.innerHTML += `<div class="summary-item"><div class="summary-label"><span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>${cat}</div><div class="summary-value">NT$ ${summary[cat]}</div></div>`;
-        }
-        if (cat !== "未分類" && familySummary[cat] !== 0 && familySummaryList) {
-            familySummaryList.innerHTML += `<div class="summary-item"><div class="summary-label"><span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>${cat}</div><div class="summary-value">NT$ ${familySummary[cat]}</div></div>`;
-        }
-        
-        // 各家用分類的合併小計（瑗家用墊款 + 綉家庭開支）
-        const combinedAmt = (summary[cat] || 0) + (familySummary[cat] || 0);
-        if (cat !== "未分類" && combinedAmt !== 0 && combinedSummaryList) {
-            combinedSummaryList.innerHTML += `<div class="summary-item"><div class="summary-label"><span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>${cat}</div><div class="summary-value">NT$ ${combinedAmt}</div></div>`;
-        }
-    });
+    // 區分上方（墊款類）與下方（開支類）的 HTML
+    let householdHtml = '';
+    let totalHouseholdGrand = 0;
 
-    grandTotalEl.textContent = `NT$ ${grandTotal}`;
+    let familyHtml = '';
+    let totalFamilyGrand = 0;
+
+    // 遍歷所有歸屬項目進行分流與渲染
+    for (const u in usageTotals) {
+        if (u === '私用') continue; // 私用不計入左側小計
+        
+        const isExpenseType = u.includes('開支');
+        const uTotal = usageTotals[u].grandTotal;
+        
+        // 產生該項目的分類列表 HTML
+        let listHtml = '';
+        CATEGORIES.forEach(cat => {
+            const catAmt = usageTotals[u].categories[cat] || 0;
+            if (cat !== "未分類" && catAmt !== 0) {
+                listHtml += `
+                    <div class="summary-item">
+                        <div class="summary-label">
+                            <span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>
+                            ${cat}
+                        </div>
+                        <div class="summary-value">NT$ ${catAmt}</div>
+                    </div>
+                `;
+            }
+        });
+        
+        if (isExpenseType) {
+            // 歸為下方家庭開支區
+            totalFamilyGrand += uTotal;
+            
+            // 決定小計大項的標題與邊線顏色
+            const titleColor = u === '綉開支' ? '#2c7a7b' : (u === '瑄開支' ? '#b7791f' : '#4a5568');
+            const borderCol = u === '綉開支' ? '#319795' : (u === '瑄開支' ? '#dd6b20' : '#718096');
+            
+            familyHtml += `
+                <div style="margin-bottom: 1.5rem; background: rgba(255, 255, 255, 0.4); padding: 0.75rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <h3 style="font-size: 1.05rem; color: ${titleColor}; margin-top: 0; margin-bottom: 0.5rem; border-bottom: 2px solid ${borderCol}; padding-bottom: 4px; font-weight: bold;">${u}</h3>
+                    <div class="summary-list">
+                        ${listHtml || '<div style="font-size:0.85rem; color:#a0aec0; padding: 0.5rem 0;">當月尚無此項交易</div>'}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #cbd5e0; font-size: 0.95rem; color: #2d3748;">
+                        <span>小計</span>
+                        <span>NT$ ${uTotal}</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            // 歸為上方墊款區
+            totalHouseholdGrand += uTotal;
+            householdHtml += `
+                <div style="margin-bottom: 1rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.75rem;">
+                    <h4 style="font-size: 0.95rem; color: #4a5568; margin-top: 0.5rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
+                        <span>📋 ${u}</span>
+                        <span style="font-weight: bold; color: #2b6cb0;">NT$ ${uTotal}</span>
+                    </h4>
+                    <div class="summary-list" style="margin-bottom: 0px;">
+                        ${listHtml || '<div style="font-size:0.85rem; color:#a0aec0; padding: 0.25rem 0;">當月尚無此項交易</div>'}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // 渲染上方墊款區
+    const summaryList = document.getElementById('summary-list');
+    if (summaryList) {
+        summaryList.innerHTML = householdHtml || '<div style="font-size:0.9rem; color:#a0aec0; padding:1rem; text-align:center;">當月尚無墊款交易</div>';
+    }
+    
+    // 渲染下方家庭開支區
+    const familyContainer = document.getElementById('family-sections-container');
+    if (familyContainer) {
+        familyContainer.innerHTML = familyHtml || '<div style="font-size:0.9rem; color:#a0aec0; padding:1rem; text-align:center;">當月尚無家庭開支交易</div>';
+    }
+
+    // 渲染各家用分類合併小計 (瑗 + 綉 + 瑄 + 任何自訂的墊款/開支項目)
+    const combinedSummaryList = document.getElementById('combined-summary-list');
+    if (combinedSummaryList) {
+        combinedSummaryList.innerHTML = '';
+        CATEGORIES.forEach(cat => {
+            let combinedAmt = 0;
+            for (const u in usageTotals) {
+                if (u === '私用') continue;
+                combinedAmt += (usageTotals[u].categories[cat] || 0);
+            }
+            if (cat !== "未分類" && combinedAmt !== 0) {
+                combinedSummaryList.innerHTML += `
+                    <div class="summary-item">
+                        <div class="summary-label">
+                            <span class="cat-dot" style="background-color: ${colors[cat] || 'gray'}"></span>
+                            ${cat}
+                        </div>
+                        <div class="summary-value">NT$ ${combinedAmt}</div>
+                    </div>
+                `;
+            }
+        });
+    }
+
+    // 上方總計
+    grandTotalEl.textContent = `NT$ ${totalHouseholdGrand}`;
+    
+    // 宗親會發票
     const hhInvoiceEl = document.getElementById('household-invoice-total');
     if (hhInvoiceEl) hhInvoiceEl.textContent = `NT$ ${householdInvoiceTotal}`;
+    
+    // 下方總計
     const fGT = document.getElementById('family-grand-total');
-    if (fGT) fGT.textContent = `NT$ ${familyGrandTotal}`;
+    if (fGT) fGT.textContent = `NT$ ${totalFamilyGrand}`;
+    
+    // 合併總計 (上方總計 + 下方總計)
     const cGT = document.getElementById('combined-grand-total');
-    if (cGT) cGT.textContent = `NT$ ${grandTotal + familyGrandTotal}`;
+    if (cGT) cGT.textContent = `NT$ ${totalHouseholdGrand + totalFamilyGrand}`;
 
     // 更新家庭現金流統計列
     const cashflowSummaryBar = document.getElementById('cashflow-summary-bar');
@@ -1236,12 +1614,7 @@ async function updateYearInvoiceTotal() {
     }
 }
 
-// 快速標籤
-let QUICK_TAGS = ["水費", "電費", "電話費", "櫟安司機揹錢", "房屋稅", "地價稅", "國有財產局地租", "外看薪水", "外看餐費", "勞保費", "健保費", "餐食", "藥品", "櫟安交通費"];
-const savedTags = localStorage.getItem('customQuickTags');
-if (savedTags) {
-    JSON.parse(savedTags).forEach(t => { if (!QUICK_TAGS.includes(t)) QUICK_TAGS.push(t); });
-}
+// 快速標籤渲染函數
 
 function renderQuickTags() {
     const container = document.getElementById('quick-tags');
@@ -1250,10 +1623,16 @@ function renderQuickTags() {
         const btn = document.createElement('button');
         btn.className = 'quick-tag';
         btn.textContent = tag;
-        btn.onclick = () => { document.getElementById('manual-details').value = tag; };
+        btn.onclick = () => { 
+            const detailsInput = document.getElementById('manual-details');
+            if (detailsInput) {
+                detailsInput.value = tag;
+            }
+        };
         container.appendChild(btn);
     });
     
+    // 新增常用項目按鈕
     const addBtn = document.createElement('button');
     addBtn.className = 'quick-tag';
     addBtn.style.background = '#edf2f7';
@@ -1268,6 +1647,91 @@ function renderQuickTags() {
         }
     };
     container.appendChild(addBtn);
+
+    // 管理項目按鈕 (修改/更名常用項目標籤)
+    const manageBtn = document.createElement('button');
+    manageBtn.className = 'quick-tag';
+    manageBtn.style.background = '#edf2f7';
+    manageBtn.style.color = '#744210';
+    manageBtn.textContent = '⚙️ 管理項目';
+    manageBtn.onclick = () => {
+        handleManageQuickTags();
+    };
+    container.appendChild(manageBtn);
+}
+
+// 管理與修改常用標籤更名（同步雲端批次更名）
+async function handleManageQuickTags() {
+    if (QUICK_TAGS.length === 0) {
+        alert("目前尚無常用項目可供管理。");
+        return;
+    }
+    
+    let promptMsg = "目前的常用項目（明細）如下：\n";
+    QUICK_TAGS.forEach((d, i) => {
+        promptMsg += `${i + 1}. ${d}\n`;
+    });
+    promptMsg += "\n請輸入您想要【修改名稱】的明細項目編號 (如 1) 或完整名稱：";
+    
+    const choice = prompt(promptMsg);
+    if (!choice) return;
+    
+    let oldName = "";
+    const idx = parseInt(choice.trim(), 10);
+    if (!idx || idx < 1 || idx > QUICK_TAGS.length) {
+        const found = QUICK_TAGS.find(d => d === choice.trim());
+        if (found) oldName = found;
+    } else {
+        oldName = QUICK_TAGS[idx - 1];
+    }
+    
+    if (!oldName) {
+        alert("找不到您輸入的項目，操作已取消。");
+        return;
+    }
+    
+    const newName = prompt(`請輸入「${oldName}」的新名稱：`);
+    if (!newName || !newName.trim()) {
+        alert("名稱不可為空，操作已取消。");
+        return;
+    }
+    
+    const cleanNewName = newName.trim();
+    if (QUICK_TAGS.includes(cleanNewName)) {
+        alert("該項目名稱已存在！");
+        return;
+    }
+    
+    const index = QUICK_TAGS.indexOf(oldName);
+    if (index !== -1) {
+        QUICK_TAGS[index] = cleanNewName;
+        localStorage.setItem('customQuickTags', JSON.stringify(QUICK_TAGS));
+    }
+    
+    if (confirm(`是否要同步將雲端資料庫中，所有消費明細為「${oldName}」的歷史交易紀錄一次性更名為「${cleanNewName}」？\n（這能避免舊帳務分析時出現分類斷層）`)) {
+        try {
+            const { error } = await supabaseClient
+                .from('transactions')
+                .update({ details: cleanNewName })
+                .eq('details', oldName);
+                
+            if (error) throw error;
+            
+            state.bankRecords.forEach(r => {
+                if (r.details === oldName) {
+                    r.details = cleanNewName;
+                }
+            });
+            
+            alert(`✅ 同步修改完成！已更新歷史資料中的消費明細名稱。`);
+        } catch (err) {
+            console.error("同步失敗:", err.message);
+            alert(`❌ 雲端更新失敗: ${err.message}`);
+        }
+    }
+    
+    renderQuickTags();
+    renderTable();
 }
 
 // 手動新增視窗
@@ -1294,8 +1758,14 @@ if (addCashflowBtn) {
         // 重設記帳選單與預設值
         manualMonthSelector.innerHTML = monthSelector.innerHTML;
         manualMonthSelector.value = state.currentMonth;
-        document.getElementById('manual-details').value = "";
+        
+        const detailsInput = document.getElementById('manual-details');
+        if (detailsInput) {
+            detailsInput.value = "生活費入帳";
+        }
+        
         document.getElementById('manual-amount').value = "";
+        document.getElementById('manual-bank').value = "現金";
         
         updateManualDateByDefault(state.currentMonth);
         manualModal.classList.add('active');
@@ -1324,9 +1794,21 @@ if (addExpenseBtn) {
         // 重設記帳選單與預設值
         manualMonthSelector.innerHTML = monthSelector.innerHTML;
         manualMonthSelector.value = state.currentMonth;
-        document.getElementById('manual-details').value = "";
+        
+        const detailsInput = document.getElementById('manual-details');
+        if (detailsInput) {
+            detailsInput.value = ""; // 預設為空值不用下拉了，可接受手動輸入
+        }
+        
         document.getElementById('manual-amount').value = "";
-        document.getElementById('manual-usage').value = "瑗家用墊款";
+        document.getElementById('manual-bank').value = "現金";
+        
+        // 動態渲染手動新增 Modal 裡面的歸屬選單
+        const manualUsageSelect = document.getElementById('manual-usage');
+        if (manualUsageSelect) {
+            manualUsageSelect.innerHTML = renderUsageSelectOptions("瑗家用墊款");
+            manualUsageSelect.value = "瑗家用墊款";
+        }
         
         updateManualDateByDefault(state.currentMonth);
         renderQuickTags();
@@ -1344,10 +1826,18 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
     if (details === '生活費已撥款') {
         details = '生活費入帳（待確認）';
     }
+    
+    // 只要明細不為空、且不在現有的常用標籤（QUICK_TAGS）中，自動新增至快速標籤列表
+    if (details && !QUICK_TAGS.includes(details) && details !== '生活費入帳（待確認）' && details !== '月度事件紀錄') {
+        QUICK_TAGS.push(details);
+        localStorage.setItem('customQuickTags', JSON.stringify(QUICK_TAGS));
+        renderQuickTags();
+    }
     const amountStr = document.getElementById('manual-amount').value.trim();
     const cat = document.getElementById('manual-cat').value;
     const usage = state.modalType === 'cashflow' ? '私用' : document.getElementById('manual-usage').value;
     const selectedMonth = document.getElementById('manual-month').value;
+    const bankVal = document.getElementById('manual-bank').value;
     
     let amountTWD = NaN;
     if (amountStr) {
@@ -1376,7 +1866,8 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
                 amountTWD: amountTWD,
                 category: cat,
                 usageType: usage,
-                month: selectedMonth
+                month: selectedMonth,
+                bank: bankVal
             });
 
             // 若修改後的月份與當前畫面月份不同，從當前畫面移除這筆資料
@@ -1405,7 +1896,7 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
             const newRecord = {
                 id: "m_" + Date.now(),
                 month: selectedMonth,
-                bank: "現金",
+                bank: bankVal,
                 date: date,
                 details: details,
                 amount_twd: amountTWD,
@@ -1518,7 +2009,7 @@ document.getElementById('confirm-pdf-btn').addEventListener('click', () => {
     } else if (showHousehold) {
         printTab = '瑗家用墊款'; // 只勾選瑗家用墊款，則僅印出瑗家用明細
     } else if (showFamily) {
-        printTab = '綉家庭開支'; // 只勾選綉家庭開支，則僅印出綉家庭明細
+        printTab = '家庭開支'; // 只勾選家庭開支，則僅印出家庭明細
     } else {
         printTab = prevTab; // 若都沒勾選，維持當前所在的頁籤明細
     }
@@ -2167,12 +2658,12 @@ async function loadReportData() {
     
     tableBody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding: 3rem;">⏳ 正在從雲端載入 ${reportState.currentYear} 年度指定項目數據...</td></tr>`;
     
-    // 定義要統計的 19 個指定明細項目 (依照使用者指定的順序顯示)
+    // 定義要統計的 18 個指定明細項目 (依照使用者指定的順序顯示)
     const REPORT_ITEMS = [
         "水費", "電費", "電話費", "櫟安司機揹錢", "房屋稅", 
         "地價稅", "國有財產局地租", "外看薪水", "外看餐費", "勞保費", 
         "健保費", "餐食", "藥品", "櫟安交通費", "鼻胃管插管", 
-        "墊款少付費用", "就業安定費", "中信公營代收", "就醫交通"
+        "墊款少付費用", "就業安定費", "就醫交通"
     ];
     
     try {
@@ -2203,8 +2694,11 @@ async function loadReportData() {
                 // 如果明細為「餐食」或交易分類為「食」，則通通計入「餐食」項目
                 if (cleanDetail === '餐食' || r.category === '食') {
                     dataStructure['餐食'][monthIdx] += amt;
+                } else if (cleanDetail === '中信公營代收') {
+                    // 歸納至國有財產局地租
+                    dataStructure['國有財產局地租'][monthIdx] += amt;
                 } else if (REPORT_ITEMS.includes(cleanDetail)) {
-                    // 其餘 18 個指定明細項目，依精確名稱累計
+                    // 其餘指定明細項目，依精確名稱累計
                     if (cleanDetail !== '餐食') {
                         dataStructure[cleanDetail][monthIdx] += amt;
                     }

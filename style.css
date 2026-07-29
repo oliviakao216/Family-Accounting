@@ -807,3 +807,118 @@ body {
 .cashflow-section.collapsed #add-cashflow-btn {
     display: none !important;
 }
+
+/* Google 表單風格的隨手記 Modal */
+#manual-modal .modal-content {
+    background-color: #f0ebf8 !important;
+    border-radius: 8px !important;
+    padding: 0 !important;
+    max-width: 520px !important;
+    border: none !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2) !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+}
+
+#manual-modal .modal-header-banner {
+    height: 10px;
+    background-color: #673ab7; /* 經典 Google 表單紫 */
+}
+
+#manual-modal .modal-title-card {
+    background: #ffffff;
+    margin: 12px;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #dadce0;
+    border-top: 8px solid #673ab7; /* 紫色頂條 */
+    background-color: #ffffff;
+}
+
+#manual-modal .modal-title-card h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #202124;
+    font-weight: 500;
+}
+
+/* 每個輸入區塊卡片 */
+#manual-modal .form-group-card {
+    background-color: #ffffff;
+    margin: 12px;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #dadce0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#manual-modal .form-group-card:focus-within {
+    border-color: #673ab7 !important;
+    box-shadow: 0 1px 3px rgba(103, 58, 183, 0.3) !important;
+}
+
+#manual-modal .form-group-card label {
+    font-size: 0.95rem;
+    color: #202124;
+    font-weight: 500;
+}
+
+#manual-modal .form-group-card input.summary-input,
+#manual-modal .form-group-card select.cat-select,
+#manual-modal .form-group-card select.usage-select {
+    width: 100%;
+    border: none !important;
+    border-bottom: 1px solid #dadce0 !important;
+    padding: 0.5rem 0 !important;
+    font-size: 0.95rem !important;
+    color: #202124 !important;
+    outline: none !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    transition: border-bottom-color 0.2s !important;
+}
+
+#manual-modal .form-group-card input.summary-input:focus,
+#manual-modal .form-group-card select.cat-select:focus,
+#manual-modal .form-group-card select.usage-select:focus {
+    border-bottom: 2px solid #673ab7 !important;
+}
+
+/* 底部按鈕區 */
+#manual-modal .modal-footer {
+    padding: 12px 1.5rem 1.5rem 1.5rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+#manual-modal .modal-footer button {
+    padding: 0.5rem 1.5rem !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    border: none !important;
+    transition: background-color 0.2s !important;
+}
+
+#manual-modal #cancel-manual-btn {
+    background-color: transparent !important;
+    color: #5f6368 !important;
+}
+
+#manual-modal #cancel-manual-btn:hover {
+    background-color: rgba(95, 99, 104, 0.08) !important;
+}
+
+#manual-modal #confirm-manual-btn {
+    background-color: #673ab7 !important;
+    color: #ffffff !important;
+}
+
+#manual-modal #confirm-manual-btn:hover {
+    background-color: #512da8 !important;
+}

@@ -98,12 +98,14 @@
                     </div>
 
                     <div id="print-section-family">
-                        <h2>📈 綉家庭開支小計</h2>
-                        <div class="summary-list" id="family-summary-list">
-                            <!-- 家庭開支分類小計會由 JS 動態生成 -->
-                        </div>
+                        <h2>📈 家庭開支小計</h2>
+                        
+                        <!-- 家庭開支各子項動態渲染區 -->
+                        <div id="family-sections-container"></div>
+
+                        <!-- 家庭開支總支出 -->
                         <div class="total-box" style="margin-bottom: 2rem;">
-                            <span>總支出</span>
+                            <span>家庭開支總支出</span>
                             <h3 id="family-grand-total">NT$ 0</h3>
                         </div>
                     </div>
@@ -114,9 +116,25 @@
                             <!-- 各家用分類合併小計會由 JS 動態生成 -->
                         </div>
                         <div class="total-box" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);">
-                            <span>合併總計 (瑗家用墊款 + 綉家庭開支)</span>
+                            <span>合併總計 (瑗家用墊款 + 家庭開支)</span>
                             <h3 id="combined-grand-total">NT$ 0</h3>
                         </div>
+                    </div>
+
+                    <!-- 當月事件紀錄區塊 (由右側上方移至左下角) -->
+                    <div class="event-notes-container collapsed print-hidden" style="margin-top: 1.5rem; margin-bottom: 0.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <label for="event-notes" style="font-weight: bold; color: #2d3748; font-size: 0.9rem; display: flex; align-items: center; gap: 0.3rem; margin: 0;">
+                                📝 當月事件紀錄 <span style="font-size: 0.75rem; color: #a0aec0; font-weight: normal;">(自動同步)</span>
+                            </label>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span id="event-notes-status" style="font-size: 0.7rem; color: #38a169; opacity: 0; transition: opacity 0.3s; font-weight: bold;">🟢 已同步</span>
+                                <button id="toggle-event-notes-btn" class="collapse-trigger" style="font-size: 0.75rem; padding: 2px 6px;">展開 ▼</button>
+                            </div>
+                        </div>
+                        <textarea id="event-notes" placeholder="在此輸入本月特殊事件紀錄..." 
+                                  style="width: 100%; border: 1px solid #cbd5e0; border-radius: 6px; padding: 0.5rem; font-size: 0.85rem; line-height: 1.4; resize: vertical; min-height: 60px; max-height: 120px; overflow-y: auto; outline: none; box-sizing: border-box; display: block; font-family: inherit; background-color: #ffffff;"
+                                  rows="3"></textarea>
                     </div>
                 </div>
             </aside>
@@ -128,27 +146,10 @@
                         <h2>📝 <span id="year-label">----</span> 年 <span id="month-label">--</span> 月帳務明細 (雲端資料庫) <span style="font-size: 0.85rem; color: #718096; font-weight: normal; margin-left: 10px; display: inline-block;">(註：負值為溢收款，正值為實際支出)</span></h2>
                     </div>
                     <div class="tabs" id="usage-tabs">
-                        <button class="tab-btn active" data-tab="all">全部</button>
-                        <button class="tab-btn" data-tab="瑗家用墊款">瑗家用墊款</button>
-                        <button class="tab-btn" data-tab="私用">私用</button>
-                        <button class="tab-btn" data-tab="綉家庭開支">綉家庭開支</button>
+                        <!-- 由 JS 根據 USAGES 動態生成 -->
                     </div>
                 </div>
-                <!-- 事件紀錄區塊 -->
-                <div class="event-notes-container collapsed print-hidden" style="margin-bottom: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <label for="event-notes" style="font-weight: bold; color: #2d3748; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; margin: 0;">
-                            📝 當月事件紀錄 <span style="font-size: 0.75rem; color: #a0aec0; font-weight: normal;">(將自動同步至雲端)</span>
-                        </label>
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <span id="event-notes-status" style="font-size: 0.75rem; color: #38a169; opacity: 0; transition: opacity 0.3s; font-weight: bold;">🟢 已同步至雲端</span>
-                            <button id="toggle-event-notes-btn" class="collapse-trigger">展開 ▼</button>
-                        </div>
-                    </div>
-                    <textarea id="event-notes" placeholder="在此輸入本月特殊事件紀錄（例如：今天二姐買了冰箱，但錢誰出不知道，帳怎麼算不知道...）" 
-                              style="width: 100%; border: 1px solid #cbd5e0; border-radius: 6px; padding: 0.6rem; font-size: 0.9rem; line-height: 1.5; resize: vertical; min-height: 72px; max-height: 120px; overflow-y: auto; outline: none; box-sizing: border-box; display: block; font-family: inherit; background-color: #ffffff;"
-                              rows="3"></textarea>
-                </div>
+
                  <!-- 💵 家庭現金流明細區塊 -->
                 <div class="cashflow-section collapsed" style="margin-bottom: 2rem;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-left: 4px solid #3182ce; padding-left: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -164,13 +165,12 @@
                         <table class="transaction-table">
                             <thead>
                                 <tr>
-                                    <th>信用卡/銀行</th>
+                                    <th>付款方式</th>
                                     <th>日期</th>
                                     <th>現金流項目</th>
                                     <th>分類 (可修改)</th>
                                     <th>備註 (可修改)</th>
                                     <th class="text-right">台幣金額</th>
-                                    <th class="text-right">外幣金額</th>
                                     <th style="text-align: center;">操作</th>
                                 </tr>
                             </thead>
@@ -197,7 +197,7 @@
                         <table class="transaction-table">
                             <thead>
                                 <tr>
-                                    <th>信用卡/銀行</th>
+                                    <th>付款方式</th>
                                     <th class="sortable" data-sort="date" style="cursor: pointer; user-select: none;">日期 <span class="sort-icon"></span></th>
                                     <th class="sortable" data-sort="details" style="cursor: pointer; user-select: none;">消費明細 <span class="sort-icon"></span></th>
                                     <th class="sortable" data-sort="category" style="cursor: pointer; user-select: none;">分類 (可修改) <span class="sort-icon"></span></th>
@@ -205,7 +205,6 @@
                                     <th class="sortable" data-sort="clan" style="cursor: pointer; user-select: none;">宗親會 <span class="sort-icon"></span></th>
                                     <th class="sortable" data-sort="usageType" style="cursor: pointer; user-select: none;">歸屬 <span class="sort-icon"></span></th>
                                     <th class="sortable text-right" data-sort="amountTWD" style="cursor: pointer; user-select: none;">台幣金額 <span class="sort-icon"></span></th>
-                                    <th class="text-right">外幣金額</th>
                                     <th style="text-align: center;">操作</th>
                                 </tr>
                             </thead>
@@ -237,43 +236,76 @@
 
     <!-- 手動新增視窗 -->
     <div id="manual-modal" class="modal">
-        <div class="modal-content" style="max-width: 500px; padding: 2rem;">
-            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">➕ 雲端隨手記帳</h3>
+        <div class="modal-content">
+            <div class="modal-header-banner"></div>
             
-            <label style="font-weight: bold; font-size: 0.9rem;">日期 (格式: YYYY-MM-DD)</label>
-            <input type="text" id="manual-date" class="summary-input" style="width: 100%; margin-bottom: 1rem; border: 1px solid #e2e8f0; padding: 0.5rem;">
+            <div class="modal-title-card">
+                <h3>➕ 雲端隨手記帳</h3>
+            </div>
             
-            <label style="font-weight: bold; font-size: 0.9rem;">記帳月份</label>
-            <select id="manual-month" class="cat-select" style="width: 100%; margin-bottom: 1rem; padding: 0.5rem;"></select>
+            <!-- 1. 記帳月份 (置頂) -->
+            <div class="form-group-card">
+                <label style="font-weight: bold; font-size: 0.9rem;">記帳月份</label>
+                <select id="manual-month" class="cat-select" style="width: 100%; border: none; border-bottom: 1px solid #dadce0; padding: 0.5rem 0;"></select>
+            </div>
             
-            <label style="font-weight: bold; font-size: 0.9rem;">消費明細</label>
-            <input type="text" id="manual-details" class="summary-input" style="width: 100%; margin-bottom: 0.5rem; border: 1px solid #e2e8f0; padding: 0.5rem;">
+            <!-- 2. 日期 -->
+            <div class="form-group-card">
+                <label style="font-weight: bold; font-size: 0.9rem;">日期 (格式: YYYY-MM-DD)</label>
+                <input type="text" id="manual-date" class="summary-input" style="width: 100%; border: none; border-bottom: 1px solid #dadce0; padding: 0.5rem 0;">
+            </div>
             
-            <!-- 快速輸入標籤區塊 -->
-            <div id="manual-tags-group">
+            <!-- 3. 付款方式 -->
+            <div class="form-group-card">
+                <label style="font-weight: bold; font-size: 0.9rem;">付款方式</label>
+                <select id="manual-bank" class="cat-select" style="width: 100%; border: none; border-bottom: 1px solid #dadce0; padding: 0.5rem 0;">
+                    <option value="現金" selected>現金</option>
+                    <option value="轉帳">轉帳</option>
+                    <option value="聯邦信用卡">聯邦信用卡</option>
+                    <option value="中信信用卡">中信信用卡</option>
+                    <option value="永豐信用卡">永豐信用卡</option>
+                </select>
+            </div>
+            
+            <!-- 4. 歸屬 -->
+            <div id="manual-usage-group" class="form-group-card">
+                <label style="font-weight: bold; font-size: 0.9rem;">歸屬</label>
+                <select id="manual-usage" class="usage-select" style="width: 100%; border: none; border-bottom: 1px solid #dadce0; padding: 0.5rem 0;">
+                    <option value="瑗家用墊款" selected>瑗家用墊款</option>
+                    <option value="私用">私用</option>
+                    <option value="綉開支">綉開支</option>
+                    <option value="瑄開支">瑄開支</option>
+                </select>
+            </div>
+            
+            <!-- 5. 金額 -->
+            <div class="form-group-card">
+                <label style="font-weight: bold; font-size: 0.9rem;">金額 (支援算式，如 100+50)</label>
+                <input type="text" id="manual-amount" class="summary-input" style="width: 100%; border: none; border-bottom: 1px solid #dadce0; padding: 0.5rem 0;" placeholder="例如: 848+550">
+            </div>
+            
+            <!-- 6. 分類 (移到消費明細上方) -->
+            <div class="form-group-card">
+                <label style="font-weight: bold; font-size: 0.9rem;">分類</label>
+                <select id="manual-cat" class="cat-select" style="width: 100%; border: none; border-bottom: 1px solid #dadce0; padding: 0.5rem 0;"></select>
+            </div>
+            
+            <!-- 7. 消費明細 (輸入框) -->
+            <div class="form-group-card">
+                <label style="font-weight: bold; font-size: 0.9rem;">消費明細</label>
+                <input type="text" id="manual-details" class="summary-input" style="width: 100%; border: none; border-bottom: 1px solid #dadce0; padding: 0.5rem 0;" placeholder="請輸入或選擇消費明細">
+            </div>
+            
+            <!-- 8. 快速輸入標籤 -->
+            <div id="manual-tags-group" class="form-group-card" style="border: none; background: transparent; padding: 0 1.5rem; margin-top: -0.5rem; box-shadow: none;">
                 <div id="quick-tags" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
                     <!-- Tags will be rendered by JS -->
                 </div>
             </div>
             
-            <label style="font-weight: bold; font-size: 0.9rem;">金額 (支援算式，如 100+50)</label>
-            <input type="text" id="manual-amount" class="summary-input" style="width: 100%; margin-bottom: 1rem; border: 1px solid #e2e8f0; padding: 0.5rem;" placeholder="例如: 848+550">
-            
-            <label style="font-weight: bold; font-size: 0.9rem;">分類</label>
-            <select id="manual-cat" class="cat-select" style="width: 100%; margin-bottom: 1rem; padding: 0.5rem;"></select>
-            
-            <div id="manual-usage-group">
-                <label style="font-weight: bold; font-size: 0.9rem;">歸屬</label>
-                <select id="manual-usage" class="usage-select" style="width: 100%; margin-bottom: 1.5rem; padding: 0.5rem;">
-                    <option value="瑗家用墊款" selected>瑗家用墊款</option>
-                    <option value="私用">私用</option>
-                    <option value="綉家庭開支">綉家庭開支</option>
-                </select>
-            </div>
-            
-            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                <button id="cancel-manual-btn" class="primary-btn" style="background: #a0aec0;">取消</button>
-                <button id="confirm-manual-btn" class="primary-btn">儲存至雲端</button>
+            <div class="modal-footer" style="padding: 12px 1.5rem 1.5rem 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                <button id="cancel-manual-btn" class="primary-btn" style="background: transparent; color: #5f6368; border: none; padding: 0.5rem 1.5rem; cursor: pointer;">取消</button>
+                <button id="confirm-manual-btn" class="primary-btn" style="background: #673ab7; color: white; border: none; padding: 0.5rem 1.5rem; border-radius: 4px; cursor: pointer;">儲存</button>
             </div>
         </div>
     </div>
@@ -356,10 +388,10 @@
                     <input type="checkbox" id="pdf-opt-household" checked style="width: auto;"> 📊 瑗家用墊款分類小計與總額 (含宗親會)
                 </label>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem;">
-                    <input type="checkbox" id="pdf-opt-family" checked style="width: auto;"> 📈 綉家庭開支小計與總額
+                    <input type="checkbox" id="pdf-opt-family" checked style="width: auto;"> 📈 家庭開支小計與總額
                 </label>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem;">
-                    <input type="checkbox" id="pdf-opt-combined" checked style="width: auto;"> 🔗 合併總計 (瑗家用墊款 + 綉家庭開支)
+                    <input type="checkbox" id="pdf-opt-combined" checked style="width: auto;"> 🔗 合併總計 (瑗家用墊款 + 家庭開支)
                 </label>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; color: #e53e3e; font-weight: bold; border-top: 1px dashed #cbd5e0; padding-top: 0.5rem; margin-top: 0.25rem;">
                     <input type="checkbox" id="pdf-opt-exclude-private" checked style="width: auto;"> 🚫 PDF 排除「私用」明細資料
