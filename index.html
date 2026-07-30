@@ -47,6 +47,7 @@
                 <input type="file" id="file-upload" accept=".json" style="display: none;">
                 
                 <button id="run-match-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; background: #e2e8f0; color: #4a5568; border: none; cursor: pointer; font-size: 0.9rem;" title="執行自動比對">自</button>
+                <button id="show-logs-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; background: #e2e8f0; color: #4a5568; border: none; cursor: pointer; font-size: 0.9rem;" title="使用記錄 (Log)">使</button>
 
                 <button id="show-report-btn" class="primary-btn" style="background-color: #6b46c1; border-color: #553c9a; padding: 0.5rem 1rem; font-size: 0.9rem;">
                     <span class="icon">📊</span> 年度報表
@@ -370,6 +371,33 @@
                 <button id="clear-settings-btn" class="primary-btn" style="background: #e53e3e; border-color: #c53030;">清除 Key</button>
                 <button id="cancel-settings-btn" class="primary-btn" style="background: #a0aec0; border-color: #718096;">取消</button>
                 <button id="save-settings-btn" class="primary-btn">儲存設定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 使用記錄彈窗 (Modal) -->
+    <div id="logs-modal" class="modal">
+        <div class="modal-content" style="max-width: 650px; padding: 2rem; border-radius: var(--radius-lg);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #edf2f7; padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <h3 style="color: var(--primary-color); margin: 0;">📋 系統使用記錄 (Log)</h3>
+                <button id="close-logs-btn" style="border-radius: 50%; width: 28px; height: 28px; border: none; cursor: pointer; background: #e2e8f0; color: #4a5568; font-weight: bold; font-size: 0.9rem; display: flex; justify-content: center; align-items: center;">✕</button>
+            </div>
+            
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #edf2f7; border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                    <thead>
+                        <tr style="background: #edf2f7; color: #4a5568; font-weight: bold; border-bottom: 1px solid #e2e8f0;">
+                            <th style="padding: 0.75rem; width: 140px;">時間</th>
+                            <th style="padding: 0.75rem; width: 120px;">修改者 IP</th>
+                            <th style="padding: 0.75rem;">修改內容</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table-body">
+                        <tr>
+                            <td colspan="3" style="text-align: center; color: #a0aec0; padding: 2rem;">正在載入使用記錄...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

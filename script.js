@@ -268,6 +268,7 @@ async function handleManageUsages(recordId, selectElement) {
 // 全域狀態
 let lastSavedNotes = null; // 用於事件紀錄防重送
 let state = {
+    userIp: null, // 用於日誌紀錄的快取 IP
     bankRecords: [],
     ecommerceOrders: [],
     conflicts: [], // 需要手動選擇的衝突清單
@@ -588,6 +589,71 @@ function checkAndRestoreDraft(actionType, targetId) {
     return false;
 }
 
+// 取得修改者公網 IP (快取於記憶體防連發)
+async function getCachedUserIp() {
+    if (state.userIp) return state.userIp;
+    try {
+        const res = await fetch('https://api.ipify.org?format=json');
+        const data = await res.json();
+        state.userIp = data.ip || '未知 IP';
+    } catch (e) {
+        state.userIp = '未知 IP';
+    }
+    return state.userIp;
+}
+
+// 寫入日誌到 Supabase logs 資料表
+async function writeLog(content) {
+    try {
+        const ip = await getCachedUserIp();
+        const { error } = await supabaseClient.from('logs').insert([{
+            ip: ip,
+            content: content
+        }]);
+        if (error) throw error;
+    } catch (e) {
+        console.error("寫入日誌失敗：", e);
+    }
+}
+
+// 載入並渲染最近 100 筆系統使用日誌
+async function loadAndRenderLogs() {
+    const logsBody = document.getElementById('logs-table-body');
+    if (!logsBody) return;
+    
+    logsBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #a0aec0; padding: 2rem;">正在載入使用記錄...</td></tr>`;
+    
+    try {
+        const { data, error } = await supabaseClient
+            .from('logs')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100);
+            
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+            logsBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #a0aec0; padding: 2rem;">目前尚無使用記錄。</td></tr>`;
+            return;
+        }
+        
+        logsBody.innerHTML = data.map(log => {
+            const date = new Date(log.created_at);
+            const formattedTime = date.toLocaleString('zh-TW', { hour12: false });
+            return `
+                <tr style="border-bottom: 1px solid #edf2f7;">
+                    <td style="padding: 0.75rem; color: #4a5568; font-family: monospace; white-space: nowrap;">${formattedTime}</td>
+                    <td style="padding: 0.75rem; color: #4a5568; font-family: monospace; white-space: nowrap;">${log.ip || '未知'}</td>
+                    <td style="padding: 0.75rem; color: #2d3748; white-space: pre-wrap; word-break: break-all;">${log.content || ''}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error("載入日誌失敗：", err);
+        logsBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #e53e3e; padding: 2rem;">❌ 載入日誌失敗！<br><br>請確認是否已於 Supabase 資料庫中建立「logs」資料表。<br>且確認其 API 權限為公開允許讀取/寫入。</td></tr>`;
+    }
+}
+
 // 初始化
 async function init() {
     // 渲染並綁定頁籤事件
@@ -648,6 +714,29 @@ async function init() {
     
     // 初始化年度報表事件
     initReportView();
+
+    // 綁定使用日誌按鈕事件
+    const showLogsBtn = document.getElementById('show-logs-btn');
+    const closeLogsBtn = document.getElementById('close-logs-btn');
+    const logsModal = document.getElementById('logs-modal');
+    if (showLogsBtn && logsModal) {
+        showLogsBtn.addEventListener('click', () => {
+            loadAndRenderLogs();
+            logsModal.classList.add('active');
+        });
+    }
+    if (closeLogsBtn && logsModal) {
+        closeLogsBtn.addEventListener('click', () => {
+            logsModal.classList.remove('active');
+        });
+    }
+    if (logsModal) {
+        logsModal.addEventListener('click', (e) => {
+            if (e.target === logsModal) {
+                logsModal.classList.remove('active');
+            }
+        });
+    }
 
     // 綁定計算各銀行總計按鈕
     const bankTotalBtn = document.getElementById('bank-total-btn');
@@ -1032,6 +1121,7 @@ fileUpload.addEventListener('change', (e) => {
                         .upsert(insertData, { onConflict: 'id' });
 
                     if (error) throw error;
+                    writeLog(`批次匯入資料檔成功：共 ${insertData.length} 筆銀行交易紀錄`);
                     
                     alert('✅ 匯入成功！銀行交易與電商明細已成功載入並永久保存在雲端！');
                     await loadData(); // 重新載入
@@ -1086,7 +1176,35 @@ async function updateRecordInDb(id, updates) {
     const record = state.bankRecords.find(r => r.id === id);
     if (!record) return;
 
+    // 準備日誌修改內容 (比對舊值與新值)
+    const diffs = [];
+    if (updates.category !== undefined && record.category !== updates.category) {
+        diffs.push(`分類 "${record.category}" ➔ "${updates.category}"`);
+    }
+    if (updates.usageType !== undefined && record.usageType !== updates.usageType) {
+        diffs.push(`歸屬 "${record.usageType}" ➔ "${updates.usageType}"`);
+    }
+    if (updates.customSummary !== undefined && record.customSummary !== updates.customSummary) {
+        diffs.push(`備註 "${record.customSummary || '無'}" ➔ "${updates.customSummary || '無'}"`);
+    }
+    if (updates.date !== undefined && record.date !== updates.date) {
+        diffs.push(`日期 "${record.date}" ➔ "${updates.date}"`);
+    }
+    if (updates.details !== undefined && record.details !== updates.details) {
+        diffs.push(`細項 "${record.details}" ➔ "${updates.details}"`);
+    }
+    if (updates.amountTWD !== undefined && record.amountTWD !== updates.amountTWD) {
+        diffs.push(`金額 "${record.amountTWD}" ➔ "${updates.amountTWD}"`);
+    }
+    if (updates.bank !== undefined && record.bank !== updates.bank) {
+        diffs.push(`管道 "${record.bank}" ➔ "${updates.bank}"`);
+    }
+    if (updates.month !== undefined && record.month !== updates.month) {
+        diffs.push(`月份 "${record.month}" ➔ "${updates.month}"`);
+    }
+
     // 先在畫面更新，保持順暢感
+    const oldRecordCopy = { ...record };
     Object.assign(record, updates);
     updateSummary();
 
@@ -1103,11 +1221,21 @@ async function updateRecordInDb(id, updates) {
     if (updates.bank !== undefined) dbUpdates.bank = updates.bank;
     
     await supabaseClient.from('transactions').update(dbUpdates).eq('id', id);
+    
+    // 雲端更新成功後寫入日誌
+    if (diffs.length > 0) {
+        const logContent = `修改帳目 [${oldRecordCopy.month}] [${oldRecordCopy.date}] (${oldRecordCopy.details}): ` + diffs.join(', ');
+        writeLog(logContent);
+    }
+    
     // 雲端更新完成後，再次更新年度發票小計，確保其與雲端一致，避免非同步時間差導致的數值不正確
     updateYearInvoiceTotal();
 }
 
 async function deleteRecordInDb(id) {
+    const record = state.bankRecords.find(r => r.id === id);
+    if (!record) return;
+
     // 從畫面移除
     state.bankRecords = state.bankRecords.filter(r => r.id !== id);
     renderTable();
@@ -1115,6 +1243,11 @@ async function deleteRecordInDb(id) {
 
     // 雲端移除
     await supabaseClient.from('transactions').delete().eq('id', id);
+    
+    // 雲端移除成功後寫入日誌
+    const logContent = `刪除帳目: [${record.month}] [${record.date}] [${record.bank || '現金'}] ${record.details} | 金額: NT$ ${record.amountTWD} | 歸屬: ${record.usageType}`;
+    writeLog(logContent);
+
     // 雲端刪除完成後，再次更新年度發票小計，確保其與雲端一致，避免非同步時間差導致的數值不正確
     updateYearInvoiceTotal();
 }
@@ -2117,6 +2250,10 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
             const { error } = await supabaseClient.from('transactions').insert([newRecord]);
             if (error) throw error;
             
+            // 雲端新增成功後寫入日誌
+            const logContent = `新增帳目: [${selectedMonth}] [${date}] [${bankVal}] ${details} | 金額: NT$ ${amountTWD} | 分類: ${cat} | 歸屬: ${usage}`;
+            writeLog(logContent);
+            
             // 更新畫面 (如果新增的月份與當前月份相同)
             if (selectedMonth === state.currentMonth) {
                 state.bankRecords.unshift({
@@ -2760,6 +2897,8 @@ async function handleParsedBankRecords(records) {
             .upsert(finalInsertPayload, { onConflict: 'id' });
 
         if (error) throw error;
+        writeLog(`AI 圖片記帳匯入成功：共 ${finalInsertPayload.length} 筆新交易紀錄`);
+        
         alert(`✅ 成功同步匯入 ${finalInsertPayload.length} 筆帳單新交易至雲端！`);
         await loadData();
     } catch (err) {
