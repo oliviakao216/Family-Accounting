@@ -34,10 +34,11 @@ if (savedCashflowCat) {
 let USAGES = ["瑗家用墊款", "私用", "綉開支", "瑄開支"];
 const savedUsages = localStorage.getItem("customUsages");
 if (savedUsages) {
-    const parsed = JSON.parse(savedUsages);
-    parsed.forEach(u => {
-        if (!USAGES.includes(u)) USAGES.push(u);
-    });
+    try {
+        const parsed = JSON.parse(savedUsages);
+        // 以儲存的選單為準，但確保核心項目「瑗家用墊款」與「私用」絕對存在
+        USAGES = Array.from(new Set(["瑗家用墊款", "私用", ...parsed]));
+    } catch (e) {}
 }
 
 // 常用消費明細與快速標籤（拿掉 UE, PF）
@@ -87,118 +88,180 @@ function renderUsageTabs() {
 }
 
 // 管理/修改歸屬名稱的對話框與雲端批次更名邏輯
-async function handleManageUsages(recordId, selectElement) {
-    let promptMsg = "目前的所有歸屬項目如下：\n";
-    USAGES.forEach((u, i) => {
-        promptMsg += `${i + 1}. ${u}\n`;
-    });
-    promptMsg += "\n請輸入您想要【修改名稱】的歸屬項目編號 (如 1) 或完整名稱：";
-    
-    const choice = prompt(promptMsg);
-    if (!choice) {
-        if (recordId) {
-            const r = state.bankRecords.find(item => item.id === recordId);
-            if (r) selectElement.value = r.usageType;
-        } else {
-            selectElement.value = "瑗家用墊款";
-        }
-        return;
-    }
-    
-    let oldName = "";
-    const idx = parseInt(choice.trim(), 10);
-    if (!isNaN(idx) && idx >= 1 && idx <= USAGES.length) {
-        oldName = USAGES[idx - 1];
+// 輔助函數：還原選單原本的值
+function restoreSelectValue(recordId, selectElement) {
+    if (recordId) {
+        const r = state.bankRecords.find(item => item.id === recordId);
+        if (r) selectElement.value = r.usageType;
     } else {
-        const found = USAGES.find(u => u === choice.trim());
-        if (found) oldName = found;
+        selectElement.value = "瑗家用墊款";
+    }
+}
+
+// 管理/修改/刪除歸屬項目的對話框
+async function handleManageUsages(recordId, selectElement) {
+    let listMsg = "目前的所有歸屬項目如下：\n";
+    USAGES.forEach((u, i) => {
+        listMsg += `${i + 1}. ${u}\n`;
+    });
+    
+    const actionChoice = prompt(`${listMsg}\n請輸入您要對歸屬項目執行的操作：\n1. 修改名稱\n2. 刪除項目\n\n請輸入編號 (1 或 2)：`);
+    if (!actionChoice) {
+        restoreSelectValue(recordId, selectElement);
+        return;
     }
     
-    if (!oldName) {
+    const action = actionChoice.trim();
+    if (action !== '1' && action !== '2') {
+        alert("無效的輸入，操作已取消。");
+        restoreSelectValue(recordId, selectElement);
+        return;
+    }
+    
+    // 讓使用者選擇要修改或刪除哪個項目
+    const itemChoice = prompt(`目前的歸屬項目如下：\n${listMsg}\n請輸入您想要${action === '1' ? '修改' : '刪除'}的歸屬項目編號 (如 1) 或完整名稱：`);
+    if (!itemChoice) {
+        restoreSelectValue(recordId, selectElement);
+        return;
+    }
+    
+    let targetUsage = "";
+    const idx = parseInt(itemChoice.trim(), 10);
+    if (!isNaN(idx) && idx >= 1 && idx <= USAGES.length) {
+        targetUsage = USAGES[idx - 1];
+    } else {
+        const found = USAGES.find(u => u === itemChoice.trim());
+        if (found) targetUsage = found;
+    }
+    
+    if (!targetUsage) {
         alert("找不到您輸入的項目，操作已取消。");
-        if (recordId) {
-            const r = state.bankRecords.find(item => item.id === recordId);
-            if (r) selectElement.value = r.usageType;
-        } else {
-            selectElement.value = "瑗家用墊款";
-        }
+        restoreSelectValue(recordId, selectElement);
         return;
     }
     
-    if (oldName === "私用" || oldName === "瑗家用墊款") {
-        alert(`系統核心項目「${oldName}」不可修改。`);
-        if (recordId) {
-            const r = state.bankRecords.find(item => item.id === recordId);
-            if (r) selectElement.value = r.usageType;
-        } else {
-            selectElement.value = "瑗家用墊款";
-        }
+    // 系統核心項目保護，不可修改或刪除
+    if (targetUsage === "私用" || targetUsage === "瑗家用墊款") {
+        alert(`系統核心項目「${targetUsage}」不可修改或刪除。`);
+        restoreSelectValue(recordId, selectElement);
         return;
     }
     
-    const newName = prompt(`請輸入「${oldName}」的新名稱：`);
-    if (!newName || !newName.trim()) {
-        alert("名稱不可為空，操作已取消。");
-        if (recordId) {
-            const r = state.bankRecords.find(item => item.id === recordId);
-            if (r) selectElement.value = r.usageType;
-        } else {
-            selectElement.value = "瑗家用墊款";
+    if (action === '1') {
+        // --- 修改名稱邏輯 ---
+        const newName = prompt(`請輸入「${targetUsage}」的新名稱：`);
+        if (!newName || !newName.trim()) {
+            alert("名稱不可為空，操作已取消。");
+            restoreSelectValue(recordId, selectElement);
+            return;
         }
-        return;
-    }
-    
-    const cleanNewName = newName.trim();
-    if (USAGES.includes(cleanNewName)) {
-        alert("該名稱已存在！");
-        if (recordId) {
-            const r = state.bankRecords.find(item => item.id === recordId);
-            if (r) selectElement.value = r.usageType;
-        } else {
-            selectElement.value = "瑗家用墊款";
+        
+        const cleanNewName = newName.trim();
+        if (USAGES.includes(cleanNewName)) {
+            alert("該名稱已存在！");
+            restoreSelectValue(recordId, selectElement);
+            return;
         }
-        return;
-    }
-    
-    const index = USAGES.indexOf(oldName);
-    if (index !== -1) {
-        USAGES[index] = cleanNewName;
-        localStorage.setItem('customUsages', JSON.stringify(USAGES));
-    }
-    
-    if (confirm(`是否要同步將雲端資料庫中，所有歸屬為「${oldName}」的歷史交易紀錄一次性更名為「${cleanNewName}」？\n（這能避免舊帳務分析時出現分類斷層）`)) {
+        
+        const index = USAGES.indexOf(targetUsage);
+        if (index !== -1) {
+            USAGES[index] = cleanNewName;
+            localStorage.setItem('customUsages', JSON.stringify(USAGES));
+        }
+        
+        if (confirm(`是否要同步將雲端資料庫中，所有歸屬為「${targetUsage}」的歷史交易紀錄一次性更名為「${cleanNewName}」？\n（這能避免舊帳務分析時出現分類斷層）`)) {
+            try {
+                const { error } = await supabaseClient
+                    .from('transactions')
+                    .update({ usage_type: cleanNewName })
+                    .eq('usage_type', targetUsage);
+                    
+                if (error) throw error;
+                
+                state.bankRecords.forEach(r => {
+                    if (r.usageType === targetUsage) {
+                        r.usageType = cleanNewName;
+                    }
+                });
+                
+                alert(`✅ 同步修改完成！已更新歷史資料中的歸屬名稱。`);
+            } catch (err) {
+                console.error("同步失敗:", err.message);
+                alert(`❌ 雲端更新失敗: ${err.message}`);
+            }
+        } else {
+            if (recordId) {
+                await updateRecordInDb(recordId, { usageType: cleanNewName });
+            }
+        }
+        
+        renderUsageTabs();
+        renderTable();
+        updateSummary();
+        
+        if (!recordId) {
+            selectElement.innerHTML = renderUsageSelectOptions(cleanNewName);
+            selectElement.value = cleanNewName;
+        }
+        
+    } else if (action === '2') {
+        // --- 刪除項目邏輯 ---
+        
+        // 1. 檢查本地當前月份是否有交易使用此歸屬
+        const isUsedLocally = state.bankRecords.some(r => r.usageType === targetUsage);
+        if (isUsedLocally) {
+            alert(`⚠️ 無法刪除！\n\n本月交易明細中已有帳目歸屬為「${targetUsage}」。\n請先將該交易修改為其他歸屬，再嘗試刪除。`);
+            restoreSelectValue(recordId, selectElement);
+            return;
+        }
+        
+        // 顯示檢查中...
+        if (selectElement) selectElement.disabled = true;
+        
         try {
-            const { error } = await supabaseClient
+            // 2. 檢查雲端資料庫是否有任何歷史交易使用此歸屬
+            const { error, count } = await supabaseClient
                 .from('transactions')
-                .update({ usage_type: cleanNewName })
-                .eq('usage_type', oldName);
+                .select('id', { count: 'exact', head: true })
+                .eq('usage_type', targetUsage);
                 
             if (error) throw error;
             
-            state.bankRecords.forEach(r => {
-                if (r.usageType === oldName) {
-                    r.usageType = cleanNewName;
-                }
-            });
+            if (count > 0) {
+                alert(`⚠️ 無法刪除！\n\n雲端歷史資料庫中已有 ${count} 筆交易歸屬為「${targetUsage}」。\n為了防止歷史帳務數據出錯，不可刪除已被使用的歸屬項目。`);
+                restoreSelectValue(recordId, selectElement);
+                return;
+            }
             
-            alert(`✅ 同步修改完成！已更新歷史資料中的歸屬名稱。`);
+            // 3. 通過檢查，執行刪除
+            if (confirm(`您確定要刪除歸屬項目「${targetUsage}」嗎？\n(此項目目前沒有任何交易紀錄使用)`)) {
+                USAGES = USAGES.filter(u => u !== targetUsage);
+                localStorage.setItem('customUsages', JSON.stringify(USAGES));
+                
+                alert(`✅ 已成功刪除歸屬項目「${targetUsage}」！`);
+                
+                renderUsageTabs();
+                renderTable();
+                updateSummary();
+                
+                // 還原選單顯示
+                if (!recordId) {
+                    selectElement.innerHTML = renderUsageSelectOptions("瑗家用墊款");
+                    selectElement.value = "瑗家用墊款";
+                } else {
+                    restoreSelectValue(recordId, selectElement);
+                }
+            } else {
+                restoreSelectValue(recordId, selectElement);
+            }
+            
         } catch (err) {
-            console.error("同步失敗:", err.message);
-            alert(`❌ 雲端更新失敗: ${err.message}`);
+            console.error("檢查雲端歸屬交易失敗:", err);
+            alert(`❌ 檢查雲端資料失敗: ${err.message}，請稍後再試。`);
+            restoreSelectValue(recordId, selectElement);
+        } finally {
+            if (selectElement) selectElement.disabled = false;
         }
-    } else {
-        if (recordId) {
-            await updateRecordInDb(recordId, { usageType: cleanNewName });
-        }
-    }
-    
-    renderUsageTabs();
-    renderTable();
-    updateSummary();
-    
-    if (!recordId) {
-        selectElement.innerHTML = renderUsageSelectOptions(cleanNewName);
-        selectElement.value = cleanNewName;
     }
 }
 
@@ -439,7 +502,90 @@ function resetMatchButton() {
     runMatchBtn.style.cursor = '';
     runMatchBtn.style.boxShadow = '';
     runMatchBtn.style.transform = '';
-    runMatchBtn.innerHTML = '<span class="icon">🔍</span> 執行自動比對';
+    runMatchBtn.innerHTML = '自';
+}
+
+// 關閉 Modal 並將未儲存草稿快取 10 分鐘
+function closeManualModalWithCache() {
+    const manualModal = document.getElementById('manual-modal');
+    if (!manualModal) return;
+    
+    const date = document.getElementById('manual-date').value.trim();
+    const details = document.getElementById('manual-details').value.trim();
+    const amountStr = document.getElementById('manual-amount').value.trim();
+    const cat = document.getElementById('manual-cat').value;
+    const usage = state.modalType === 'cashflow' ? '私用' : document.getElementById('manual-usage').value;
+    const selectedMonth = document.getElementById('manual-month').value;
+    const bankVal = document.getElementById('manual-bank').value;
+    
+    // 只要金額或消費明細不為空，即視為「輸到一半」
+    const hasInput = details !== "" || amountStr !== "";
+    
+    if (hasInput) {
+        const draft = {
+            editingId: state.editingId,
+            modalType: state.modalType,
+            data: {
+                date,
+                details,
+                amountTWD: amountStr,
+                category: cat,
+                usageType: usage,
+                month: selectedMonth,
+                bank: bankVal
+            },
+            timestamp: Date.now()
+        };
+        localStorage.setItem('manual_modal_draft', JSON.stringify(draft));
+    } else {
+        localStorage.removeItem('manual_modal_draft');
+    }
+    
+    manualModal.classList.remove('active');
+}
+
+// 檢查並嘗試還原 10 分鐘內未完成之草稿
+function checkAndRestoreDraft(actionType, targetId) {
+    const draftStr = localStorage.getItem('manual_modal_draft');
+    if (!draftStr) return false;
+    
+    try {
+        const draft = JSON.parse(draftStr);
+        // 效期 10 分鐘 (10 * 60 * 1000 = 600000 毫秒)
+        const isExpired = (Date.now() - draft.timestamp) > 600000;
+        if (isExpired) {
+            localStorage.removeItem('manual_modal_draft');
+            return false;
+        }
+        
+        // 必須為同種類型且編輯同一個目標（或同為新增）才自動還原，以防資料錯置
+        const isMatched = (draft.editingId === targetId) && (draft.modalType === actionType);
+        if (isMatched) {
+            const data = draft.data;
+            document.getElementById('manual-month').value = data.month;
+            document.getElementById('manual-date').value = data.date;
+            document.getElementById('manual-bank').value = data.bank;
+            document.getElementById('manual-amount').value = data.amountTWD;
+            document.getElementById('manual-cat').value = data.category;
+            
+            const detailsInput = document.getElementById('manual-details');
+            if (detailsInput) detailsInput.value = data.details;
+            
+            const usageSelect = document.getElementById('manual-usage');
+            if (usageSelect && actionType !== 'cashflow') {
+                // 如果歸屬不在 USAGES 內（例如被刪了），動態加回
+                if (!USAGES.includes(data.usageType)) {
+                    USAGES.push(data.usageType);
+                }
+                usageSelect.innerHTML = renderUsageSelectOptions(data.usageType);
+                usageSelect.value = data.usageType;
+            }
+            return true;
+        }
+    } catch (e) {
+        console.error("還原草稿時發生錯誤:", e);
+    }
+    return false;
 }
 
 // 初始化
@@ -646,6 +792,17 @@ async function init() {
     }
 
     await loadData();
+
+    // 檢查是否開啟個人設備自動彈出隨手記帳視窗設定 (限首次載入，工作階段內切換月份不重複彈出)
+    const shouldAutoOpen = localStorage.getItem('auto_open_expense_modal') === 'true';
+    const hasOpenedThisSession = sessionStorage.getItem('has_auto_opened_expense') === 'true';
+    if (shouldAutoOpen && !hasOpenedThisSession) {
+        sessionStorage.setItem('has_auto_opened_expense', 'true');
+        setTimeout(() => {
+            const addExpenseBtn = document.getElementById('add-expense-btn');
+            if (addExpenseBtn) addExpenseBtn.click();
+        }, 600); // 延遲 600ms 等待主頁面資料載入及渲染完成，確保視覺流暢
+    }
 }
 
 // 儲存事件紀錄至雲端 (使用 upsert)
@@ -1355,6 +1512,13 @@ function renderTable() {
                 usageSelect.value = record.usageType;
             }
             
+            // 嘗試還原 10 分鐘內未完成之編輯草稿
+            const restored = checkAndRestoreDraft(state.modalType, id);
+            if (restored) {
+                document.querySelector('#manual-modal h3').textContent = 
+                    (state.modalType === 'cashflow' ? '✏️ 編輯現金流記錄' : '✏️ 編輯隨手記帳 (家庭開支)') + ' (已還原草稿)';
+            }
+            
             document.getElementById('manual-modal').classList.add('active');
         });
     });
@@ -1454,7 +1618,6 @@ function updateSummary() {
     for (const u in usageTotals) {
         if (u === '私用') continue; // 私用不計入左側小計
         
-        const isExpenseType = u.includes('開支') || u.includes('瑄') || u.includes('綉');
         const uTotal = usageTotals[u].grandTotal;
         
         // 產生該項目的分類列表 HTML
@@ -1474,13 +1637,30 @@ function updateSummary() {
             }
         });
         
-        if (isExpenseType) {
-            // 歸為下方家庭開支區
-            totalFamilyGrand += uTotal;
-            
+        // 1. 上方墊款區：維持只呈現「瑗家用墊款」這個歸屬的獨立統計
+        if (u === '瑗家用墊款') {
+            totalHouseholdGrand += uTotal;
+            householdHtml += `
+                <div style="margin-bottom: 1rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.75rem;">
+                    <h4 style="font-size: 0.95rem; color: #4a5568; margin-top: 0.5rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
+                        <span>📋 ${u}</span>
+                        <span style="font-weight: bold; color: #2b6cb0;">NT$ ${uTotal}</span>
+                    </h4>
+                    <div class="summary-list" style="margin-bottom: 0px;">
+                        ${listHtml || '<div style="font-size:0.85rem; color:#a0aec0; padding: 0.25rem 0;">當月尚無此項交易</div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 2. 下方家庭開支區：只要不是私用（即包含 瑗、綉、瑄，以及未來新增的所有項目），皆屬於家庭開支，需計入總和
+        totalFamilyGrand += uTotal;
+        
+        // 只有當該項目的加總金額不為 0 時，才在左側渲染其區塊，以防顯示無交易的空項目
+        if (uTotal !== 0) {
             // 決定小計大項的標題與邊線顏色
-            const titleColor = u === '綉開支' ? '#2c7a7b' : (u === '瑄開支' ? '#b7791f' : '#4a5568');
-            const borderCol = u === '綉開支' ? '#319795' : (u === '瑄開支' ? '#dd6b20' : '#718096');
+            const titleColor = u === '綉開支' ? '#2c7a7b' : (u === '瑄開支' ? '#b7791f' : (u === '瑗家用墊款' ? '#4c51bf' : '#4a5568'));
+            const borderCol = u === '綉開支' ? '#319795' : (u === '瑄開支' ? '#dd6b20' : (u === '瑗家用墊款' ? '#4c51bf' : '#718096'));
             
             familyHtml += `
                 <div style="margin-bottom: 1.5rem; background: rgba(255, 255, 255, 0.4); padding: 0.75rem; border-radius: 8px; border: 1px solid #e2e8f0;">
@@ -1491,20 +1671,6 @@ function updateSummary() {
                     <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #cbd5e0; font-size: 0.95rem; color: #2d3748;">
                         <span>小計</span>
                         <span>NT$ ${uTotal}</span>
-                    </div>
-                </div>
-            `;
-        } else {
-            // 歸為上方墊款區
-            totalHouseholdGrand += uTotal;
-            householdHtml += `
-                <div style="margin-bottom: 1rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.75rem;">
-                    <h4 style="font-size: 0.95rem; color: #4a5568; margin-top: 0.5rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
-                        <span>📋 ${u}</span>
-                        <span style="font-weight: bold; color: #2b6cb0;">NT$ ${uTotal}</span>
-                    </h4>
-                    <div class="summary-list" style="margin-bottom: 0px;">
-                        ${listHtml || '<div style="font-size:0.85rem; color:#a0aec0; padding: 0.25rem 0;">當月尚無此項交易</div>'}
                     </div>
                 </div>
             `;
@@ -1558,9 +1724,9 @@ function updateSummary() {
     const fGT = document.getElementById('family-grand-total');
     if (fGT) fGT.textContent = `NT$ ${totalFamilyGrand}`;
     
-    // 合併總計 (上方總計 + 下方總計)
+    // 合併總計 (上方總計 + 下方總計) -> 因為下方家庭開支總支出 (totalFamilyGrand) 已經包含了瑗、綉、瑄及新增，代表全部，因此合併總計直接就是 totalFamilyGrand，避免重複累加
     const cGT = document.getElementById('combined-grand-total');
-    if (cGT) cGT.textContent = `NT$ ${totalHouseholdGrand + totalFamilyGrand}`;
+    if (cGT) cGT.textContent = `NT$ ${totalFamilyGrand}`;
 
     // 更新家庭現金流統計列
     const cashflowSummaryBar = document.getElementById('cashflow-summary-bar');
@@ -1754,6 +1920,7 @@ async function handleManageQuickTags() {
 // 手動新增視窗
 const manualModal = document.getElementById('manual-modal');
 // 點擊新增現金流
+// 點擊新增現金流
 if (addCashflowBtn) {
     addCashflowBtn.addEventListener('click', () => {
         state.editingId = null;
@@ -1785,6 +1952,13 @@ if (addCashflowBtn) {
         document.getElementById('manual-bank').value = "現金";
         
         updateManualDateByDefault(state.currentMonth);
+        
+        // 嘗試還原 10 分鐘內未完成之新增草稿
+        const restored = checkAndRestoreDraft('cashflow', null);
+        if (restored) {
+            document.querySelector('#manual-modal h3').textContent = '💵 新增現金流記錄 (已還原草稿)';
+        }
+        
         manualModal.classList.add('active');
     });
 }
@@ -1829,13 +2003,29 @@ if (addExpenseBtn) {
         
         updateManualDateByDefault(state.currentMonth);
         renderQuickTags();
+        
+        // 嘗試還原 10 分鐘內未完成之新增草稿
+        const restored = checkAndRestoreDraft('expense', null);
+        if (restored) {
+            document.querySelector('#manual-modal h3').textContent = '🛒 雲端隨手記帳 (已還原草稿)';
+        }
+        
         manualModal.classList.add('active');
     });
 }
 
 document.getElementById('cancel-manual-btn').addEventListener('click', () => {
-    manualModal.classList.remove('active');
+    closeManualModalWithCache();
 });
+
+// 點擊旁邊空白處（Modal 背景）關閉手動新增視窗
+if (manualModal) {
+    manualModal.addEventListener('click', (e) => {
+        if (e.target === manualModal) {
+            closeManualModalWithCache();
+        }
+    });
+}
 
 document.getElementById('confirm-manual-btn').addEventListener('click', async () => {
     const date = document.getElementById('manual-date').value.trim();
@@ -1908,6 +2098,7 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
                 renderTable();
             }
             manualModal.classList.remove('active');
+            localStorage.removeItem('manual_modal_draft');
         } else {
             // 新增紀錄
             const newRecord = {
@@ -1939,8 +2130,10 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
                 renderTable();
                 updateSummary();
                 manualModal.classList.remove('active');
+                localStorage.removeItem('manual_modal_draft');
             } else {
                 manualModal.classList.remove('active');
+                localStorage.removeItem('manual_modal_draft');
                 
                 const y = selectedMonth.substring(0, 4);
                 const mon = parseInt(selectedMonth.substring(4, 6), 10);
@@ -2087,7 +2280,7 @@ runMatchBtn.addEventListener('click', async () => {
 
     // 禁用按鈕顯示進行中
     runMatchBtn.disabled = true;
-    runMatchBtn.innerHTML = '⏳ 正在執行自動比對...';
+    runMatchBtn.innerHTML = '⏳';
 
     try {
         for (const record of targetRecords) {
@@ -2129,7 +2322,7 @@ function setButtonDone() {
     runMatchBtn.style.cursor = 'not-allowed';
     runMatchBtn.style.boxShadow = 'none';
     runMatchBtn.style.transform = 'none';
-    runMatchBtn.innerHTML = '<span class="icon">✔️</span> 蝦皮/酷澎/momo 已比對完成';
+    runMatchBtn.innerHTML = '✔️';
 }
 
 // 配對銀行與訂單，並更新至 Supabase 雲端
@@ -2261,9 +2454,14 @@ function initSettingsAndAI() {
     }
     geminiKeyInput.value = savedApiKey;
 
+    const autoOpenInput = document.getElementById('auto-open-modal-input');
+
     // 開啟設定彈窗
     settingsBtn.addEventListener('click', () => {
         geminiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+        if (autoOpenInput) {
+            autoOpenInput.checked = localStorage.getItem('auto_open_expense_modal') === 'true';
+        }
         settingsModal.classList.add('active');
     });
 
@@ -2277,19 +2475,25 @@ function initSettingsAndAI() {
         const key = geminiKeyInput.value.trim();
         if (key) {
             localStorage.setItem('gemini_api_key', key);
-            alert("✅ Gemini API Key 已成功儲存在您的瀏覽器中！");
         } else {
             localStorage.removeItem('gemini_api_key');
-            alert("ℹ️ 已清除 API Key。");
         }
+        
+        // 儲存開啟網頁自動記帳設定
+        const autoOpenVal = autoOpenInput ? autoOpenInput.checked : false;
+        localStorage.setItem('auto_open_expense_modal', autoOpenVal ? 'true' : 'false');
+        
+        alert("✅ 系統設定已成功儲存於您的瀏覽器中！");
         settingsModal.classList.remove('active');
     });
 
     // 清除設定
     clearSettingsBtn.addEventListener('click', () => {
         localStorage.removeItem('gemini_api_key');
+        localStorage.removeItem('auto_open_expense_modal');
         geminiKeyInput.value = '';
-        alert("🗑️ API Key 已清除！");
+        if (autoOpenInput) autoOpenInput.checked = false;
+        alert("🗑️ 系統設定已清除！");
         settingsModal.classList.remove('active');
     });
 

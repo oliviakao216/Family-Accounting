@@ -350,11 +350,21 @@
             <label style="font-weight: bold; font-size: 0.9rem; display: block; margin-bottom: 0.5rem;">Google Gemini API Key</label>
             <input type="password" id="gemini-key-input" class="summary-input" style="width: 100%; margin-bottom: 0.5rem; border: 1px solid #e2e8f0; padding: 0.5rem;" placeholder="請輸入您的 API Key...">
             
-            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.4;">
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
                 💡 為了您的隱私，此 Key 只會安全儲存在您此台裝置的本地瀏覽器中，不會上傳至任何其他伺服器。
                 <br>
                 🔗 尚未擁有 Key？<a href="https://aistudio.google.com/apikey" target="_blank" style="color: #3182ce; font-weight: bold; text-decoration: underline;">點此免費申請 Gemini API Key</a>
             </p>
+            
+            <!-- 個人設備開啟網頁自動彈出隨手記帳設定 -->
+            <div style="margin-bottom: 1.5rem; border-top: 1px solid #edf2f7; padding-top: 1rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; font-weight: bold;">
+                    <input type="checkbox" id="auto-open-modal-input" style="width: auto;"> 📱 開啟網頁時，自動彈出隨手記帳視窗
+                </label>
+                <span style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-left: 1.6rem; margin-top: 0.25rem;">
+                    適合不熟悉系統的大姐，讓其開啟網頁後不需尋找按鈕，直接即可記帳。此設定僅儲存於此台設備。
+                </span>
+            </div>
             
             <div style="display: flex; gap: 1rem; justify-content: flex-end;">
                 <button id="clear-settings-btn" class="primary-btn" style="background: #e53e3e; border-color: #c53030;">清除 Key</button>
