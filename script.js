@@ -782,6 +782,20 @@ async function loadData() {
         // 3. 將事件紀錄從明細中過濾剔除，其餘存入全域狀態
         state.bankRecords = cleanedData.filter(r => r.id !== noteId);
         
+        // 4. 動態補上資料庫中存在但本地暫時沒有的自訂分類與歸屬項目，以防左側小計統計遺漏
+        state.bankRecords.forEach(r => {
+            if (r.category && r.category !== "未分類") {
+                if (CASHFLOW_CATEGORIES.includes(r.category)) {
+                    // 已在現金流分類中，不重複處理
+                } else if (!CATEGORIES.includes(r.category)) {
+                    CATEGORIES.push(r.category);
+                }
+            }
+            if (r.usageType && !USAGES.includes(r.usageType) && r.usageType !== "私用") {
+                USAGES.push(r.usageType);
+            }
+        });
+        
         // 標記已經配對過的電商訂單為已配對，避免重複被配對
         state.ecommerceOrders.forEach(o => {
             const isMatched = state.bankRecords.some(r => r.matchedOrder === o.id);
@@ -1444,7 +1458,7 @@ function updateSummary() {
         let listHtml = '';
         CATEGORIES.forEach(cat => {
             const catAmt = usageTotals[u].categories[cat] || 0;
-            if (cat !== "未分類" && catAmt !== 0) {
+            if (catAmt !== 0) {
                 listHtml += `
                     <div class="summary-item">
                         <div class="summary-label">
@@ -1516,7 +1530,7 @@ function updateSummary() {
                 if (u === '私用') continue;
                 combinedAmt += (usageTotals[u].categories[cat] || 0);
             }
-            if (cat !== "未分類" && combinedAmt !== 0) {
+            if (combinedAmt !== 0) {
                 combinedSummaryList.innerHTML += `
                     <div class="summary-item">
                         <div class="summary-label">
