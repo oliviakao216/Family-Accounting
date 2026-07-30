@@ -16,7 +16,7 @@
         <header class="header">
             <div>
                 <h1>家庭帳務系統 <span style="font-size:1rem; color:#48bb78;">🟢 雲端同步中</span></h1>
-                <div style="font-size: 0.75rem; color: #a0aec0; margin-top: 2px;">系統更新時間：2026-07-02 19:46</div>
+                <div style="font-size: 0.75rem; color: #a0aec0; margin-top: 2px;">系統更新時間：2026-07-30 20:43</div>
                 <div class="print-hidden" style="font-size: 0.8rem; color: #dd6b20; background-color: #fffaf0; border: 1px solid #feebc8; padding: 0.4rem 0.8rem; border-radius: 6px; margin-top: 0.5rem; max-width: 500px; line-height: 1.4; font-weight: 500;">
                     ⚠️ 家庭開支記帳資料以 2026/5 起為紀錄範圍，2026/5 前資料未完整建置，請以 2026/5 起之紀錄作為參考。
                     <br>💡 註明：負值為溢收款，正值為實際支出。
@@ -95,14 +95,14 @@
                     </div>
 
                     <div id="print-section-family">
-                        <h2>📈 家庭開支小計</h2>
+                        <h2>📈 家庭開支(綉瑄)小計</h2>
                         
                         <!-- 家庭開支各子項動態渲染區 -->
                         <div id="family-sections-container"></div>
 
                         <!-- 家庭開支總支出 -->
                         <div class="total-box" style="margin-bottom: 2rem;">
-                            <span>家庭開支總支出</span>
+                            <span>家庭開支總支出(綉瑄)</span>
                             <h3 id="family-grand-total">NT$ 0</h3>
                         </div>
                     </div>
@@ -270,8 +270,7 @@
                 <select id="manual-usage" class="usage-select" style="width: 100%; border: none; border-bottom: 1px solid #dadce0; padding: 0.5rem 0;">
                     <option value="瑗家用墊款" selected>瑗家用墊款</option>
                     <option value="私用">私用</option>
-                    <option value="綉開支">綉開支</option>
-                    <option value="瑄開支">瑄開支</option>
+                    <option value="綉現金開支">綉現金開支</option>
                 </select>
             </div>
             
@@ -422,10 +421,10 @@
                     <input type="checkbox" id="pdf-opt-household" checked style="width: auto;"> 📊 瑗家用墊款分類小計與總額 (含宗親會)
                 </label>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem;">
-                    <input type="checkbox" id="pdf-opt-family" checked style="width: auto;"> 📈 家庭開支小計與總額
+                    <input type="checkbox" id="pdf-opt-family" checked style="width: auto;"> 📈 家庭開支小計與總額 (綉瑄)
                 </label>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem;">
-                    <input type="checkbox" id="pdf-opt-combined" checked style="width: auto;"> 🔗 合併總計 (瑗家用墊款 + 家庭開支)
+                    <input type="checkbox" id="pdf-opt-combined" checked style="width: auto;"> 🔗 合併總計 (瑗家用墊款 + 家庭開支 (綉瑄))
                 </label>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; color: #e53e3e; font-weight: bold; border-top: 1px dashed #cbd5e0; padding-top: 0.5rem; margin-top: 0.25rem;">
                     <input type="checkbox" id="pdf-opt-exclude-private" checked style="width: auto;"> 🚫 PDF 排除「私用」明細資料

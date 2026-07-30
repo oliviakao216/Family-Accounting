@@ -31,13 +31,14 @@ if (savedCashflowCat) {
 }
 
 // 全域狀態中的 USAGES 陣列與載入
-let USAGES = ["瑗家用墊款", "私用", "綉開支", "瑄開支"];
+let USAGES = ["瑗家用墊款", "私用", "綉現金開支"];
 const savedUsages = localStorage.getItem("customUsages");
 if (savedUsages) {
     try {
         const parsed = JSON.parse(savedUsages);
-        // 以儲存的選單為準，但確保核心項目「瑗家用墊款」與「私用」絕對存在
-        USAGES = Array.from(new Set(["瑗家用墊款", "私用", ...parsed]));
+        // 過濾掉未使用的預設 瑄開支，若當月資料庫有使用則會於載入時自動補回
+        const filtered = parsed.filter(u => u !== "瑄開支");
+        USAGES = Array.from(new Set(["瑗家用墊款", "私用", ...filtered]));
     } catch (e) {}
 }
 
@@ -616,6 +617,29 @@ async function writeLog(content) {
     }
 }
 
+// 記錄瀏覽頁面日誌 (動作大項後面列出時間，10分鐘內防重送，僅瀏覽行為限定)
+async function logPageView(pageName) {
+    const cacheKey = `last_log_page_${pageName}`;
+    const lastLogTime = localStorage.getItem(cacheKey);
+    const now = Date.now();
+    
+    // 限制 10 分鐘 (600000 毫秒) 內不重複記錄
+    if (lastLogTime && (now - parseInt(lastLogTime, 10) < 600000)) {
+        return;
+    }
+    
+    // 格式：動作的大項 [時間]
+    const timeStr = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+    const content = `${pageName} [${timeStr}]`;
+    
+    try {
+        await writeLog(content);
+        localStorage.setItem(cacheKey, now.toString());
+    } catch (e) {
+        console.error(`寫入頁面瀏覽日誌失敗:`, e);
+    }
+}
+
 // 載入並渲染最近 100 筆系統使用日誌
 async function loadAndRenderLogs() {
     const logsBody = document.getElementById('logs-table-body');
@@ -624,6 +648,23 @@ async function loadAndRenderLogs() {
     logsBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #a0aec0; padding: 2rem;">正在載入使用記錄...</td></tr>`;
     
     try {
+        // 1. 同步從雲端 transactions 表下載最新的 IP 角色別名配置 (id = 'ip_roles_config')
+        let ipMap = {};
+        try {
+            const { data: configData, error: configError } = await supabaseClient
+                .from('transactions')
+                .select('custom_summary')
+                .eq('id', 'ip_roles_config')
+                .maybeSingle();
+                
+            if (!configError && configData) {
+                ipMap = JSON.parse(configData.custom_summary || '{}');
+            }
+        } catch (configErr) {
+            console.error("載入雲端 IP 角色配置失敗，改用空配置：", configErr);
+        }
+
+        // 2. 載入並渲染最近 100 筆使用日誌
         const { data, error } = await supabaseClient
             .from('logs')
             .select('*')
@@ -640,14 +681,62 @@ async function loadAndRenderLogs() {
         logsBody.innerHTML = data.map(log => {
             const date = new Date(log.created_at);
             const formattedTime = date.toLocaleString('zh-TW', { hour12: false });
+            const ip = log.ip || '未知';
+            
             return `
                 <tr style="border-bottom: 1px solid #edf2f7;">
                     <td style="padding: 0.75rem; color: #4a5568; font-family: monospace; white-space: nowrap;">${formattedTime}</td>
-                    <td style="padding: 0.75rem; color: #4a5568; font-family: monospace; white-space: nowrap;">${log.ip || '未知'}</td>
+                    <td class="log-ip-cell" data-ip="${ip}" style="padding: 0.75rem; color: #4a5568; font-family: monospace; white-space: nowrap; user-select: text;">${ip}</td>
                     <td style="padding: 0.75rem; color: #2d3748; white-space: pre-wrap; word-break: break-all;">${log.content || ''}</td>
                 </tr>
             `;
         }).join('');
+
+        // 綁定隱蔽的點擊事件以設定 IP 角色別名 (無 pointer 樣式，只有點擊時才在對話框私密顯示)
+        logsBody.querySelectorAll('.log-ip-cell').forEach(cell => {
+            cell.addEventListener('click', async (e) => {
+                const clickedIp = e.currentTarget.getAttribute('data-ip');
+                if (clickedIp === '未知' || clickedIp === '未知 IP') return;
+                
+                const currentRole = ipMap[clickedIp] || '無備註';
+                const newRole = prompt(`IP [${clickedIp}] 目前角色備忘：[${currentRole}]\n\n若要修改或新增，請在下方輸入新備註（輸入空白或留空則為刪除備註）：`, currentRole === '無備註' ? '' : currentRole);
+                if (newRole === null) return; // 點擊取消
+                
+                const cleanRole = newRole.trim();
+                if (cleanRole === '') {
+                    delete ipMap[clickedIp];
+                } else {
+                    ipMap[clickedIp] = cleanRole;
+                }
+                
+                // 儲存至雲端 transactions 表作為設定項目
+                const dbConfig = {
+                    id: 'ip_roles_config',
+                    month: 'config',
+                    bank: '系統',
+                    date: new Date().toISOString().split('T')[0],
+                    details: 'IP角色配置備忘',
+                    amount_twd: 0,
+                    amount_foreign: null,
+                    currency: 'TWD',
+                    category: '系統配置',
+                    usage_type: '私用',
+                    custom_summary: JSON.stringify(ipMap)
+                };
+                
+                try {
+                    const { error: upsertErr } = await supabaseClient
+                        .from('transactions')
+                        .upsert(dbConfig, { onConflict: 'id' });
+                    if (upsertErr) throw upsertErr;
+                } catch (err) {
+                    console.error('儲存 IP 角色備忘至雲端失敗:', err);
+                    alert('儲存至雲端失敗：' + err.message);
+                }
+                
+                loadAndRenderLogs(); // 重新載入渲染以即時更新畫面
+            });
+        });
     } catch (err) {
         console.error("載入日誌失敗：", err);
         logsBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #e53e3e; padding: 2rem;">❌ 載入日誌失敗！<br><br>請確認是否已於 Supabase 資料庫中建立「logs」資料表。<br>且確認其 API 權限為公開允許讀取/寫入。</td></tr>`;
@@ -656,6 +745,28 @@ async function loadAndRenderLogs() {
 
 // 初始化
 async function init() {
+    // 一次性同步雲端與本地：將「綉開支」更名為「綉現金開支」
+    if (localStorage.getItem('renamed_xiu_expense_20260730') !== 'true') {
+        try {
+            // 1. 更新資料庫
+            await supabaseClient.from('transactions').update({ usage_type: '綉現金開支' }).eq('usage_type', '綉開支');
+            await supabaseClient.from('transactions').update({ usage_type: '綉現金開支' }).eq('usage_type', '綉家庭開支');
+            
+            // 2. 更新本地 localStorage
+            const savedUsages = localStorage.getItem("customUsages");
+            if (savedUsages) {
+                const parsed = JSON.parse(savedUsages);
+                const updated = parsed.map(u => (u === '綉開支' || u === '綉家庭開支') ? '綉現金開支' : u);
+                localStorage.setItem('customUsages', JSON.stringify(updated));
+            }
+            
+            localStorage.setItem('renamed_xiu_expense_20260730', 'true');
+            console.log('已完成雲端「綉開支」更名為「綉現金開支」');
+        } catch (e) {
+            console.error('同步更名失敗:', e);
+        }
+    }
+
     // 渲染並綁定頁籤事件
     renderUsageTabs();
 
@@ -721,6 +832,7 @@ async function init() {
     const logsModal = document.getElementById('logs-modal');
     if (showLogsBtn && logsModal) {
         showLogsBtn.addEventListener('click', () => {
+            logPageView('瀏覽系統日誌');
             loadAndRenderLogs();
             logsModal.classList.add('active');
         });
@@ -772,7 +884,7 @@ async function init() {
                 
                 // 區分大類 (瑗家用墊款與私用歸為瑗，綉歸為綉，瑄歸為瑄)
                 let categoryKey = "yuan";
-                if (r.usageType === '綉開支' || r.usageType === '綉家庭開支') {
+                if (r.usageType === '綉現金開支' || r.usageType === '綉開支' || r.usageType === '綉家庭開支') {
                     categoryKey = "xiu";
                 } else if (r.usageType === '瑄開支') {
                     categoryKey = "xuan";
@@ -881,6 +993,7 @@ async function init() {
     }
 
     await loadData();
+    logPageView('瀏覽主頁');
 
     // 檢查是否開啟個人設備自動彈出隨手記帳視窗設定 (限首次載入，工作階段內切換月份不重複彈出)
     const shouldAutoOpen = localStorage.getItem('auto_open_expense_modal') === 'true';
@@ -1009,7 +1122,7 @@ async function loadData() {
                 amountForeign: r.amount_foreign,
                 currency: r.currency,
                 category: category,
-                usageType: r.usage_type === '綉家庭開支' ? '綉開支' : r.usage_type,
+                usageType: r.usage_type ? ((r.usage_type === '綉家庭開支' || r.usage_type === '綉開支') ? '綉現金開支' : r.usage_type.trim()) : '瑗家用墊款',
                 customSummary: customSum,
                 matchedOrder: r.matched_order,
                 matchedItems: matchedOrd ? matchedOrd.items : []
@@ -1274,7 +1387,7 @@ function renderTable() {
         if (state.currentTab === 'all') {
             matchTab = true;
         } else if (state.currentTab === '家庭開支') {
-            matchTab = (record.usageType === '綉開支' || record.usageType === '瑄開支' || record.usageType === '綉家庭開支');
+            matchTab = (record.usageType === '綉現金開支' || record.usageType === '綉開支' || record.usageType === '瑄開支' || record.usageType === '綉家庭開支');
         } else {
             matchTab = (record.usageType === state.currentTab);
         }
@@ -1708,19 +1821,13 @@ function updateSummary() {
                 // 累計家庭現金流
                 cashflowSummary[r.category] = (cashflowSummary[r.category] || 0) + amt;
             } else {
-                // 自動將舊雲端資料名稱 '綉家庭開支' 轉換為 '綉開支'
                 let usageType = r.usageType;
-                if (usageType === '綉家庭開支') usageType = '綉開支';
+                if (usageType === '綉家庭開支' || usageType === '綉開支') usageType = '綉現金開支';
                 
-                // 如果 usageTotals 中沒有這個歸屬（可能是歷史資料裡有，但 USAGES 裡還沒有），動態補上
+                // 如果 usageTotals 中沒有這個歸屬，動態補上
                 if (!usageTotals[usageType]) {
                     usageTotals[usageType] = { grandTotal: 0, categories: {} };
                     CATEGORIES.forEach(c => { usageTotals[usageType].categories[c] = 0; });
-                    if (!USAGES.includes(usageType)) {
-                        USAGES.push(usageType);
-                        localStorage.setItem('customUsages', JSON.stringify(USAGES));
-                        renderUsageTabs();
-                    }
                 }
                 
                 usageTotals[usageType].categories[r.category] = (usageTotals[usageType].categories[r.category] || 0) + amt;
@@ -1742,7 +1849,7 @@ function updateSummary() {
 
     // 區分上方（墊款類）與下方（開支類）的 HTML
     let householdHtml = '';
-    let totalHouseholdGrand = 0;
+    let totalHouseholdGrand = usageTotals['瑗家用墊款'] ? usageTotals['瑗家用墊款'].grandTotal : 0;
 
     let familyHtml = '';
     let totalFamilyGrand = 0;
@@ -1772,7 +1879,6 @@ function updateSummary() {
         
         // 1. 上方墊款區：維持只呈現「瑗家用墊款」這個歸屬的獨立統計
         if (u === '瑗家用墊款') {
-            totalHouseholdGrand += uTotal;
             householdHtml += `
                 <div style="margin-bottom: 1rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.75rem;">
                     <h4 style="font-size: 0.95rem; color: #4a5568; margin-top: 0.5rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
@@ -1784,29 +1890,29 @@ function updateSummary() {
                     </div>
                 </div>
             `;
-        }
-
-        // 2. 下方家庭開支區：只要不是私用（即包含 瑗、綉、瑄，以及未來新增的所有項目），皆屬於家庭開支，需計入總和
-        totalFamilyGrand += uTotal;
-        
-        // 只有當該項目的加總金額不為 0 時，才在左側渲染其區塊，以防顯示無交易的空項目
-        if (uTotal !== 0) {
-            // 決定小計大項的標題與邊線顏色
-            const titleColor = u === '綉開支' ? '#2c7a7b' : (u === '瑄開支' ? '#b7791f' : (u === '瑗家用墊款' ? '#4c51bf' : '#4a5568'));
-            const borderCol = u === '綉開支' ? '#319795' : (u === '瑄開支' ? '#dd6b20' : (u === '瑗家用墊款' ? '#4c51bf' : '#718096'));
+        } else {
+            // 2. 下方家庭開支區：瑄開支、綉開支，以及未來新增的所有非瑗、非私用項目，各自獨立呈現
+            totalFamilyGrand += uTotal;
             
-            familyHtml += `
-                <div style="margin-bottom: 1.5rem; background: rgba(255, 255, 255, 0.4); padding: 0.75rem; border-radius: 8px; border: 1px solid #e2e8f0;">
-                    <h3 style="font-size: 1.05rem; color: ${titleColor}; margin-top: 0; margin-bottom: 0.5rem; border-bottom: 2px solid ${borderCol}; padding-bottom: 4px; font-weight: bold;">${u}</h3>
-                    <div class="summary-list">
-                        ${listHtml || '<div style="font-size:0.85rem; color:#a0aec0; padding: 0.5rem 0;">當月尚無此項交易</div>'}
+            // 只有當該項目的加總金額不為 0 時，才在左側渲染其區塊，以防顯示無交易的空項目
+            if (uTotal !== 0) {
+                // 決定小計大項的標題與邊線顏色
+                const titleColor = u === '綉現金開支' ? '#2c7a7b' : (u === '瑄開支' ? '#b7791f' : '#4a5568');
+                const borderCol = u === '綉現金開支' ? '#319795' : (u === '瑄開支' ? '#dd6b20' : '#718096');
+                
+                familyHtml += `
+                    <div style="margin-bottom: 1.5rem; background: rgba(255, 255, 255, 0.4); padding: 0.75rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <h3 style="font-size: 1.05rem; color: ${titleColor}; margin-top: 0; margin-bottom: 0.5rem; border-bottom: 2px solid ${borderCol}; padding-bottom: 4px; font-weight: bold;">${u}</h3>
+                        <div class="summary-list">
+                            ${listHtml || '<div style="font-size:0.85rem; color:#a0aec0; padding: 0.5rem 0;">當月尚無此項交易</div>'}
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #cbd5e0; font-size: 0.95rem; color: #2d3748;">
+                            <span>小計</span>
+                            <span>NT$ ${uTotal}</span>
+                        </div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #cbd5e0; font-size: 0.95rem; color: #2d3748;">
-                        <span>小計</span>
-                        <span>NT$ ${uTotal}</span>
-                    </div>
-                </div>
-            `;
+                `;
+            }
         }
     }
 
@@ -1822,7 +1928,7 @@ function updateSummary() {
         familyContainer.innerHTML = familyHtml || '<div style="font-size:0.9rem; color:#a0aec0; padding:1rem; text-align:center;">當月尚無家庭開支交易</div>';
     }
 
-    // 渲染各家用分類合併小計 (瑗 + 綉 + 瑄 + 任何自訂的墊款/開支項目)
+    // 渲染各家用分類合併小計 (瑗 + 瑄 + 綉等所有家庭項目的分類加總)
     const combinedSummaryList = document.getElementById('combined-summary-list');
     if (combinedSummaryList) {
         combinedSummaryList.innerHTML = '';
@@ -1846,20 +1952,20 @@ function updateSummary() {
         });
     }
 
-    // 上方總計
+    // 上方總計 (瑗家用墊款)
     grandTotalEl.textContent = `NT$ ${totalHouseholdGrand}`;
     
     // 宗親會發票
     const hhInvoiceEl = document.getElementById('household-invoice-total');
     if (hhInvoiceEl) hhInvoiceEl.textContent = `NT$ ${householdInvoiceTotal}`;
     
-    // 下方總計
+    // 下方總計 (瑄、綉開支總額)
     const fGT = document.getElementById('family-grand-total');
     if (fGT) fGT.textContent = `NT$ ${totalFamilyGrand}`;
     
-    // 合併總計 (上方總計 + 下方總計) -> 因為下方家庭開支總支出 (totalFamilyGrand) 已經包含了瑗、綉、瑄及新增，代表全部，因此合併總計直接就是 totalFamilyGrand，避免重複累加
+    // 合併總計 (上方墊款 + 下方家庭開支) -> 瑗、瑄、綉等全部家用開支的總計
     const cGT = document.getElementById('combined-grand-total');
-    if (cGT) cGT.textContent = `NT$ ${totalFamilyGrand}`;
+    if (cGT) cGT.textContent = `NT$ ${totalHouseholdGrand + totalFamilyGrand}`;
 
     // 更新家庭現金流統計列
     const cashflowSummaryBar = document.getElementById('cashflow-summary-bar');
@@ -2969,6 +3075,7 @@ let reportState = {
 function initReportView() {
     if (showReportBtn) {
         showReportBtn.addEventListener('click', () => {
+            logPageView('瀏覽年度報表');
             // 切換視圖
             document.querySelector('.app-container').style.display = 'none';
             document.getElementById('report-view').style.display = 'block';
