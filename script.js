@@ -2161,6 +2161,13 @@ if (manualModal) {
 }
 
 document.getElementById('confirm-manual-btn').addEventListener('click', async () => {
+    // 強制使目前焦點元素失去焦點，以觸發手機瀏覽器的選單數值同步
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+    }
+    // 稍微延遲 150 毫秒，讓手機瀏覽器（特別是 iOS Safari）有足夠時間更新 select 元素的 value
+    await new Promise(resolve => setTimeout(resolve, 150));
+
     const date = document.getElementById('manual-date').value.trim();
     let details = document.getElementById('manual-details').value.trim();
     if (details === '生活費已撥款') {
