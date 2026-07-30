@@ -1833,8 +1833,8 @@ function updateSummary() {
                 usageTotals[usageType].categories[r.category] = (usageTotals[usageType].categories[r.category] || 0) + amt;
                 usageTotals[usageType].grandTotal += amt;
                 
-                // 宗親會發票特殊累計 (限瑗家用墊款)
-                if (usageType === '瑗家用墊款' && r.customSummary && (r.customSummary.includes(' [發票]') || r.customSummary.includes(' [宗親會]'))) {
+                // 宗親會發票特殊累計 (不限歸屬)
+                if (r.customSummary && (r.customSummary.includes(' [發票]') || r.customSummary.includes(' [宗親會]'))) {
                     householdInvoiceTotal += amt;
                 }
             }
@@ -2014,7 +2014,6 @@ async function updateYearInvoiceTotal() {
         const { data, error } = await supabaseClient
             .from('transactions')
             .select('amount_twd, custom_summary')
-            .eq('usage_type', '瑗家用墊款')
             .like('month', `${year}%`);
             
         if (error) throw error;
