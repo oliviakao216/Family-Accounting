@@ -946,9 +946,10 @@ async function updateRecordInDb(id, updates) {
     if (updates.bank !== undefined) dbUpdates.bank = updates.bank;
     
     await supabaseClient.from('transactions').update(dbUpdates).eq('id', id);
+    // 雲端更新完成後，再次更新年度發票小計，確保其與雲端一致，避免非同步時間差導致的數值不正確
+    updateYearInvoiceTotal();
 }
 
-// 刪除紀錄
 async function deleteRecordInDb(id) {
     // 從畫面移除
     state.bankRecords = state.bankRecords.filter(r => r.id !== id);
@@ -957,6 +958,8 @@ async function deleteRecordInDb(id) {
 
     // 雲端移除
     await supabaseClient.from('transactions').delete().eq('id', id);
+    // 雲端刪除完成後，再次更新年度發票小計，確保其與雲端一致，避免非同步時間差導致的數值不正確
+    updateYearInvoiceTotal();
 }
 
 // 渲染表格
