@@ -39,7 +39,7 @@ body {
 
 .app-container {
     max-width: 1400px;
-    margin: 0 auto;
+    margin: 0 auto 0 0;
     padding: 2rem;
 }
 
@@ -742,7 +742,7 @@ body {
 /* 年度報表專屬樣式 */
 #report-view {
     max-width: 1400px;
-    margin: 0 auto;
+    margin: 0 auto 0 0;
     padding: 2rem;
     animation: fadeIn 0.3s ease;
 }
