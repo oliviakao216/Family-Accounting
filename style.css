@@ -38,8 +38,8 @@ body {
 }
 
 .app-container {
-    max-width: 1400px;
-    margin: 0 auto 0 0;
+    max-width: 98%;
+    margin: 0 auto 0 0; /* 明確靠左對齊，右側留空 */
     padding: 2rem;
 }
 
@@ -198,6 +198,7 @@ body {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
     border: 1px solid var(--border-color);
+    min-width: 0; /* 防止子元素(表格)過寬撐爆 grid 佈局 */
 }
 
 .main-header {
@@ -342,6 +343,7 @@ body {
 
 .detail-text {
     font-weight: 500;
+    min-width: 180px; /* 原為 120px 基準，加大 1/2 變 180px */
 }
 
 /* Category Select & Usage Select */
@@ -357,7 +359,7 @@ body {
     transition: border-color 0.2s;
 }
 
-.cat-select { width: auto; min-width: 110px; }
+.cat-select { width: auto; min-width: 35px; padding: 0.3rem 0.1rem; font-size: 0.8rem; /* 再縮小 2/5 並優化字體與間距 */ }
 .usage-select { width: auto; min-width: 90px; }
 
 .cat-select:focus, .usage-select:focus {
@@ -379,7 +381,7 @@ body {
     padding: 0.5rem;
     border-radius: var(--radius-md);
     border: 1px solid transparent;
-    width: 160px;
+    width: 96px; /* 原為 160px，縮小 2/5 */
     font-family: inherit;
     transition: all 0.2s;
 }

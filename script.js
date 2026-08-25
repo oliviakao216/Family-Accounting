@@ -56,6 +56,31 @@ if (savedTags) {
     } catch(e) {}
 }
 
+// 統一外送平台(Uber Eats/Foodpanda)的消費明細名稱格式
+function standardizeDeliveryDetails(details) {
+    if (!details) return details;
+    let text = details.trim();
+    const isUber = /優步|優食|ubereat|ue/i.test(text);
+    const isPanda = /foodpanda|fp|pf/i.test(text);
+    
+    if (isUber) {
+        const match = text.match(/^(優步|優食|ubereats?|ue)\s*[-–—]?\s*(.*)$/i);
+        if (match) {
+            const restaurant = match[2].trim();
+            return restaurant ? `ubereats-${restaurant}` : `ubereats`;
+        }
+        return `ubereats`;
+    } else if (isPanda) {
+        const match = text.match(/^(foodpanda|fp|pf)\s*[-–—]?\s*(.*)$/i);
+        if (match) {
+            const restaurant = match[2].trim();
+            return restaurant ? `熊貓-${restaurant}` : `熊貓`;
+        }
+        return `熊貓`;
+    }
+    return details;
+}
+
 // 動態渲染歸屬選單選項的 HTML
 function renderUsageSelectOptions(currentValue) {
     let optionsHtml = USAGES.map(u => `<option value="${u}" ${currentValue === u ? 'selected' : ''}>${u}</option>`).join('');
@@ -1081,15 +1106,9 @@ async function loadData() {
                 }
             }
             
-            // 雲端舊資料清洗對應為 UE 與 PF
+            // 雲端舊資料清洗對應為 ubereats 與 熊貓 (格式：ubereats-餐廳名 或 熊貓-餐廳名)
             if (details) {
-                const lowerD = details.toLowerCase();
-                let cleanD = details;
-                if (lowerD.includes('優步') || lowerD.includes('優食') || lowerD.includes('ubereat')) {
-                    cleanD = 'UE';
-                } else if (lowerD.includes('foodpanda') || lowerD.includes('fp') || lowerD.includes('pf')) {
-                    cleanD = 'PF';
-                }
+                let cleanD = standardizeDeliveryDetails(details);
                 if (cleanD !== details) {
                     details = cleanD;
                     hasChanged = true;
@@ -1212,6 +1231,7 @@ fileUpload.addEventListener('change', (e) => {
                         if (details === '生活費已撥款') {
                             details = '生活費入帳（待確認）';
                         }
+                        details = standardizeDeliveryDetails(details);
                         return {
                             id: r.id || "m_" + Date.now() + Math.random(),
                             month: state.currentMonth,
@@ -1385,7 +1405,7 @@ function renderTable() {
         // 基本過濾 (按頁籤)
         let matchTab = false;
         if (state.currentTab === 'all') {
-            matchTab = true;
+            matchTab = (record.usageType !== '私用');
         } else if (state.currentTab === '家庭開支') {
             matchTab = (record.usageType === '綉現金開支' || record.usageType === '綉開支' || record.usageType === '瑄開支' || record.usageType === '綉家庭開支');
         } else {
@@ -1506,7 +1526,7 @@ function renderTable() {
                         <button class="delete-btn" data-id="${record.id}" title="刪除此紀錄">🗑️</button>
                     </td>
                 `;
-                tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + twdTd + actionTd;
+                tr.innerHTML = bankTd + dateTd + detailTd + catTd + twdTd + itemTd + actionTd;
                 cashflowBody.appendChild(tr);
             });
         }
@@ -1568,7 +1588,7 @@ function renderTable() {
                 </td>
             `;
             
-            tr.innerHTML = bankTd + dateTd + detailTd + catTd + itemTd + invoiceTd + usageTd + twdTd + actionTd;
+            tr.innerHTML = bankTd + dateTd + detailTd + catTd + invoiceTd + usageTd + twdTd + itemTd + actionTd;
             tableBody.appendChild(tr);
         });
     }
@@ -2278,6 +2298,7 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
     if (details === '生活費已撥款') {
         details = '生活費入帳（待確認）';
     }
+    details = standardizeDeliveryDetails(details);
     
     // 只要明細不為空、且不在現有的常用標籤（QUICK_TAGS）中，自動新增至快速標籤列表
     if (details && !QUICK_TAGS.includes(details) && details !== '生活費入帳（待確認）' && details !== '月度事件紀錄') {
@@ -2970,9 +2991,10 @@ async function handleParsedBankRecords(records) {
     // 2. 去除與雲端（已在本地 state.bankRecords 載入中）重複的紀錄
     const finalInsertPayload = [];
     uniqueRecords.forEach(r => {
+        const cleanDetails = standardizeDeliveryDetails(r.details);
         const isDupInDb = state.bankRecords.some(oldRec => 
             oldRec.date === r.date && 
-            oldRec.details === r.details && 
+            oldRec.details === cleanDetails && 
             oldRec.amountTWD === r.amountTWD
         );
         if (!isDupInDb) {
@@ -2981,7 +3003,7 @@ async function handleParsedBankRecords(records) {
                 month: state.currentMonth,
                 bank: r.bank,
                 date: r.date,
-                details: r.details,
+                details: cleanDetails,
                 amount_twd: r.amountTWD,
                 amount_foreign: null,
                 currency: 'TWD',
