@@ -56,29 +56,59 @@ if (savedTags) {
     } catch(e) {}
 }
 
-// 統一外送平台(Uber Eats/Foodpanda)的消費明細名稱格式
+// 統一外送平台、行動支付與電商(Uber Eats/Foodpanda/LinePay/蝦皮/OPEN錢包)的消費明細名稱格式
 function standardizeDeliveryDetails(details) {
     if (!details) return details;
     let text = details.trim();
-    const isUber = /優步|優食|ubereat|ue/i.test(text);
-    const isPanda = /foodpanda|fp|pf/i.test(text);
+    const isUber = /優勝|優步|優食|ubereat|ue/i.test(text);
+    const isPanda = /foodpanda|fp|pf|富胖達/i.test(text);
+    const isLinePay = /連支|連加/i.test(text);
+    const isShopee = /樂購蝦皮|蝦皮/i.test(text);
+    const isOpenWallet = /代收-統一超商-OPEN錢包|OPEN錢包/i.test(text);
     
     if (isUber) {
-        const match = text.match(/^(優步|優食|ubereats?|ue)\s*[-–—]?\s*(.*)$/i);
+        const match = text.match(/^(優勝|優步|優食|ubereats?|ue)\s*[-–—]?\s*(.*)$/i);
         if (match) {
             const restaurant = match[2].trim();
-            return restaurant ? `ubereats-${restaurant}` : `ubereats`;
+            return restaurant ? `優食-${restaurant}` : `優食`;
         }
-        return `ubereats`;
+        return `優食`;
     } else if (isPanda) {
-        const match = text.match(/^(foodpanda|fp|pf)\s*[-–—]?\s*(.*)$/i);
+        const match = text.match(/^(foodpanda|fp|pf|富胖達)\s*[-–—]?\s*(.*)$/i);
         if (match) {
             const restaurant = match[2].trim();
             return restaurant ? `熊貓-${restaurant}` : `熊貓`;
         }
         return `熊貓`;
+    } else if (isLinePay) {
+        const match = text.match(/^(連支|連加)\s*[-–—]?\s*(.*)$/i);
+        if (match) {
+            const store = match[2].trim();
+            return store ? `LinePay-${store}` : `LinePay`;
+        }
+        return `LinePay`;
+    } else if (isShopee) {
+        const match = text.match(/^(樂購蝦皮|蝦皮)\s*[-–—]?\s*(.*)$/i);
+        if (match) {
+            const store = match[2].trim();
+            return store ? `蝦皮-${store}` : `蝦皮`;
+        }
+        return `蝦皮`;
+    } else if (isOpenWallet) {
+        const match = text.match(/^(代收-統一超商-OPEN錢包\s*TW|代收-統一超商-OPEN錢包|OPEN錢包)\s*[-–—]?\s*(.*)$/i);
+        if (match) {
+            const store = match[2].trim();
+            return store ? `7-11-${store}` : `7-11`;
+        }
+        return `7-11`;
     }
     return details;
+}
+
+// 統一將付款方式「○○信用卡」的「信用卡」尾碼移除
+function cleanBankName(bank) {
+    if (!bank) return bank;
+    return bank.replace(/信用卡$/, '').trim();
 }
 
 // 動態渲染歸屬選單選項的 HTML
@@ -642,6 +672,27 @@ async function writeLog(content) {
     }
 }
 
+// 儲存 IP 角色對照表至雲端
+async function saveIpMapToDb(ipMap) {
+    const dbConfig = {
+        id: 'ip_roles_config',
+        month: 'config',
+        bank: '系統',
+        date: new Date().toISOString().split('T')[0],
+        details: 'IP角色配置備忘',
+        amount_twd: 0,
+        amount_foreign: null,
+        currency: 'TWD',
+        category: '系統配置',
+        usage_type: '私用',
+        custom_summary: JSON.stringify(ipMap)
+    };
+    const { error } = await supabaseClient
+        .from('transactions')
+        .upsert(dbConfig, { onConflict: 'id' });
+    if (error) throw error;
+}
+
 // 記錄瀏覽頁面日誌 (動作大項後面列出時間，10分鐘內防重送，僅瀏覽行為限定)
 async function logPageView(pageName) {
     const cacheKey = `last_log_page_${pageName}`;
@@ -707,17 +758,18 @@ async function loadAndRenderLogs() {
             const date = new Date(log.created_at);
             const formattedTime = date.toLocaleString('zh-TW', { hour12: false });
             const ip = log.ip || '未知';
+            const displayName = ipMap[ip] || ip;
             
             return `
                 <tr style="border-bottom: 1px solid #edf2f7;">
                     <td style="padding: 0.75rem; color: #4a5568; font-family: monospace; white-space: nowrap;">${formattedTime}</td>
-                    <td class="log-ip-cell" data-ip="${ip}" style="padding: 0.75rem; color: #4a5568; font-family: monospace; white-space: nowrap; user-select: text;">${ip}</td>
+                    <td class="log-ip-cell" data-ip="${ip}" title="${ip}" style="padding: 0.75rem; color: #4a5568; font-family: monospace; white-space: nowrap; user-select: text; cursor: pointer;">${displayName}</td>
                     <td style="padding: 0.75rem; color: #2d3748; white-space: pre-wrap; word-break: break-all;">${log.content || ''}</td>
                 </tr>
             `;
         }).join('');
 
-        // 綁定隱蔽的點擊事件以設定 IP 角色別名 (無 pointer 樣式，只有點擊時才在對話框私密顯示)
+        // 綁定隱蔽的點擊事件以設定 IP 角色別名
         logsBody.querySelectorAll('.log-ip-cell').forEach(cell => {
             cell.addEventListener('click', async (e) => {
                 const clickedIp = e.currentTarget.getAttribute('data-ip');
@@ -734,32 +786,13 @@ async function loadAndRenderLogs() {
                     ipMap[clickedIp] = cleanRole;
                 }
                 
-                // 儲存至雲端 transactions 表作為設定項目
-                const dbConfig = {
-                    id: 'ip_roles_config',
-                    month: 'config',
-                    bank: '系統',
-                    date: new Date().toISOString().split('T')[0],
-                    details: 'IP角色配置備忘',
-                    amount_twd: 0,
-                    amount_foreign: null,
-                    currency: 'TWD',
-                    category: '系統配置',
-                    usage_type: '私用',
-                    custom_summary: JSON.stringify(ipMap)
-                };
-                
                 try {
-                    const { error: upsertErr } = await supabaseClient
-                        .from('transactions')
-                        .upsert(dbConfig, { onConflict: 'id' });
-                    if (upsertErr) throw upsertErr;
+                    await saveIpMapToDb(ipMap);
+                    loadAndRenderLogs(); // 重新載入渲染以即時更新畫面
                 } catch (err) {
                     console.error('儲存 IP 角色備忘至雲端失敗:', err);
                     alert('儲存至雲端失敗：' + err.message);
                 }
-                
-                loadAndRenderLogs(); // 重新載入渲染以即時更新畫面
             });
         });
     } catch (err) {
@@ -875,89 +908,193 @@ async function init() {
         });
     }
 
-    // 綁定計算各銀行總計按鈕
+    // 綁定計算各銀行總計與 IP 對照表管理按鈕
     const bankTotalBtn = document.getElementById('bank-total-btn');
     if (bankTotalBtn) {
-        bankTotalBtn.addEventListener('click', () => {
-            if (!state.bankRecords || state.bankRecords.length === 0) {
-                alert("當前月份無交易紀錄，無法計算銀行總計。");
-                return;
-            }
+        bankTotalBtn.addEventListener('click', async () => {
+            const action = prompt(`請選擇功能：\n1. 計算各銀行總計\n2. IP 對照表管理\n\n請輸入編號 (1 或 2)：`, "1");
+            if (!action) return;
             
-            // 建立統計結構：大類為 瑗 / 綉 / 瑄，小類為各銀行
-            const totals = {
-                yuan: {
-                    label: "瑗",
-                    banks: {},
-                    subtotal: 0
-                },
-                xiu: {
-                    label: "綉",
-                    banks: {},
-                    subtotal: 0
-                },
-                xuan: {
-                    label: "瑄",
-                    banks: {},
-                    subtotal: 0
-                }
-            };
-            
-            state.bankRecords.forEach(r => {
-                const bankName = r.bank || "未指定";
-                const amt = parseFloat(r.amountTWD) || 0;
-                
-                // 區分大類 (瑗家用墊款與私用歸為瑗，綉歸為綉，瑄歸為瑄)
-                let categoryKey = "yuan";
-                if (r.usageType === '綉現金開支' || r.usageType === '綉開支' || r.usageType === '綉家庭開支') {
-                    categoryKey = "xiu";
-                } else if (r.usageType === '瑄開支') {
-                    categoryKey = "xuan";
+            const cleanAction = action.trim();
+            if (cleanAction === "1") {
+                if (!state.bankRecords || state.bankRecords.length === 0) {
+                    alert("當前月份無交易紀錄，無法計算銀行總計。");
+                    return;
                 }
                 
-                // 累加小類 (銀行) 金額
-                if (!totals[categoryKey].banks[bankName]) {
-                    totals[categoryKey].banks[bankName] = 0;
+                // 建立統計結構：大類為 瑗 / 綉 / 瑄，小類為各銀行
+                const totals = {
+                    yuan: {
+                        label: "瑗",
+                        banks: {},
+                        subtotal: 0
+                    },
+                    xiu: {
+                        label: "綉",
+                        banks: {},
+                        subtotal: 0
+                    },
+                    xuan: {
+                        label: "瑄",
+                        banks: {},
+                        subtotal: 0
+                    }
+                };
+                
+                state.bankRecords.forEach(r => {
+                    const bankName = r.bank || "未指定";
+                    const amt = parseFloat(r.amountTWD) || 0;
+                    
+                    // 區分大類 (瑗家用墊款與私用歸為瑗，綉歸為綉，瑄歸為瑄)
+                    let categoryKey = "yuan";
+                    if (r.usageType === '綉現金開支' || r.usageType === '綉開支' || r.usageType === '綉家庭開支') {
+                        categoryKey = "xiu";
+                    } else if (r.usageType === '瑄開支') {
+                        categoryKey = "xuan";
+                    }
+                    
+                    // 累加小類 (銀行) 金額
+                    if (!totals[categoryKey].banks[bankName]) {
+                        totals[categoryKey].banks[bankName] = 0;
+                    }
+                    totals[categoryKey].banks[bankName] += amt;
+                    totals[categoryKey].subtotal += amt;
+                });
+                
+                let message = `🏦 ${state.currentMonth.substring(0, 4)} 年 ${parseInt(state.currentMonth.substring(4, 6), 10)} 月各銀行總計：\n\n`;
+                let grandTotal = 0;
+                
+                // 呈現「瑗」的統計結果
+                if (totals.yuan.subtotal !== 0 || Object.keys(totals.yuan.banks).length > 0) {
+                    message += `【 瑗 】\n`;
+                    for (const bank in totals.yuan.banks) {
+                        message += `• ${bank}: NT$ ${totals.yuan.banks[bank].toLocaleString()}\n`;
+                    }
+                    message += `小計: NT$ ${totals.yuan.subtotal.toLocaleString()}\n\n`;
+                    grandTotal += totals.yuan.subtotal;
                 }
-                totals[categoryKey].banks[bankName] += amt;
-                totals[categoryKey].subtotal += amt;
-            });
-            
-            let message = `🏦 ${state.currentMonth.substring(0, 4)} 年 ${parseInt(state.currentMonth.substring(4, 6), 10)} 月各銀行總計：\n\n`;
-            let grandTotal = 0;
-            
-            // 呈現「瑗」的統計結果
-            if (totals.yuan.subtotal !== 0 || Object.keys(totals.yuan.banks).length > 0) {
-                message += `【 瑗 】\n`;
-                for (const bank in totals.yuan.banks) {
-                    message += `• ${bank}: NT$ ${totals.yuan.banks[bank].toLocaleString()}\n`;
+                
+                // 呈現「綉」的統計結果
+                if (totals.xiu.subtotal !== 0 || Object.keys(totals.xiu.banks).length > 0) {
+                    message += `【 綉 】\n`;
+                    for (const bank in totals.xiu.banks) {
+                        message += `• ${bank}: NT$ ${totals.xiu.banks[bank].toLocaleString()}\n`;
+                    }
+                    message += `小計: NT$ ${totals.xiu.subtotal.toLocaleString()}\n\n`;
+                    grandTotal += totals.xiu.subtotal;
                 }
-                message += `小計: NT$ ${totals.yuan.subtotal.toLocaleString()}\n\n`;
-                grandTotal += totals.yuan.subtotal;
-            }
-            
-            // 呈現「綉」的統計結果
-            if (totals.xiu.subtotal !== 0 || Object.keys(totals.xiu.banks).length > 0) {
-                message += `【 綉 】\n`;
-                for (const bank in totals.xiu.banks) {
-                    message += `• ${bank}: NT$ ${totals.xiu.banks[bank].toLocaleString()}\n`;
-                }
-                message += `小計: NT$ ${totals.xiu.subtotal.toLocaleString()}\n\n`;
-                grandTotal += totals.xiu.subtotal;
-            }
 
-            // 呈現「瑄」的統計結果
-            if (totals.xuan.subtotal !== 0 || Object.keys(totals.xuan.banks).length > 0) {
-                message += `【 瑄 】\n`;
-                for (const bank in totals.xuan.banks) {
-                    message += `• ${bank}: NT$ ${totals.xuan.banks[bank].toLocaleString()}\n`;
+                // 呈現「瑄」的統計結果
+                if (totals.xuan.subtotal !== 0 || Object.keys(totals.xuan.banks).length > 0) {
+                    message += `【 瑄 】\n`;
+                    for (const bank in totals.xuan.banks) {
+                        message += `• ${bank}: NT$ ${totals.xuan.banks[bank].toLocaleString()}\n`;
+                    }
+                    message += `小計: NT$ ${totals.xuan.subtotal.toLocaleString()}\n\n`;
+                    grandTotal += totals.xuan.subtotal;
                 }
-                message += `小計: NT$ ${totals.xuan.subtotal.toLocaleString()}\n\n`;
-                grandTotal += totals.xuan.subtotal;
+                
+                message += `總計金額: NT$ ${grandTotal.toLocaleString()}`;
+                alert(message);
+                
+            } else if (cleanAction === "2") {
+                // 1. 同步從雲端 transactions 表下載最新的 IP 角色別名配置 (id = 'ip_roles_config')
+                let ipMap = {};
+                try {
+                    const { data: configData, error: configError } = await supabaseClient
+                        .from('transactions')
+                        .select('custom_summary')
+                        .eq('id', 'ip_roles_config')
+                        .maybeSingle();
+                        
+                    if (!configError && configData) {
+                        ipMap = JSON.parse(configData.custom_summary || '{}');
+                    }
+                } catch (configErr) {
+                    console.error("載入雲端 IP 角色配置失敗：", configErr);
+                }
+
+                // 2. 蒐集 logs 中出現過的所有 IP，並與對照表合併
+                let allIps = new Set();
+                Object.keys(ipMap).forEach(ip => allIps.add(ip));
+
+                try {
+                    const { data: logData, error: logError } = await supabaseClient
+                        .from('logs')
+                        .select('ip')
+                        .order('created_at', { ascending: false })
+                        .limit(200);
+                        
+                    if (!logError && logData) {
+                        logData.forEach(log => {
+                            if (log.ip && log.ip !== '未知' && log.ip !== '未知 IP') {
+                                allIps.add(log.ip);
+                            }
+                        });
+                    }
+                } catch (logErr) {
+                    console.error("載入日誌 IP 失敗：", logErr);
+                }
+
+                const ipList = Array.from(allIps).sort();
+
+                if (ipList.length === 0) {
+                    alert("目前系統中無任何 IP 記錄。");
+                    return;
+                }
+
+                // 3. 顯示對照表，有名字的顯示名字，沒名字的顯示 IP
+                let ipMessage = "🌐 家庭帳務系統 - IP 對照表：\n\n";
+                ipList.forEach((ip, idx) => {
+                    const name = ipMap[ip];
+                    if (name) {
+                        ipMessage += `${idx + 1}. ${name} (${ip})\n`;
+                    } else {
+                        ipMessage += `${idx + 1}. ${ip} (未設定名稱)\n`;
+                    }
+                });
+                ipMessage += "\n請輸入想要編輯的編號 (例如: 1) 或直接輸入 IP：";
+
+                const ipChoice = prompt(ipMessage);
+                if (!ipChoice) return;
+
+                let targetIp = "";
+                const choiceIdx = parseInt(ipChoice.trim(), 10);
+                if (!isNaN(choiceIdx) && choiceIdx >= 1 && choiceIdx <= ipList.length) {
+                    targetIp = ipList[choiceIdx - 1];
+                } else {
+                    const trimmedIp = ipChoice.trim();
+                    if (trimmedIp.includes('.') || trimmedIp.includes(':')) {
+                        targetIp = trimmedIp;
+                    }
+                }
+
+                if (!targetIp) {
+                    alert("無效的輸入，操作已取消。");
+                    return;
+                }
+
+                const currentRole = ipMap[targetIp] || '無備註';
+                const newRole = prompt(`IP [${targetIp}] 目前角色備忘：[${currentRole}]\n\n請輸入新備註（輸入空白或留空則為刪除備忘）：`, currentRole === '無備註' ? '' : currentRole);
+                if (newRole === null) return;
+
+                const cleanRole = newRole.trim();
+                if (cleanRole === '') {
+                    delete ipMap[targetIp];
+                } else {
+                    ipMap[targetIp] = cleanRole;
+                }
+
+                try {
+                    await saveIpMapToDb(ipMap);
+                    alert(`✅ IP [${targetIp}] 對照名稱已成功更新！`);
+                } catch (err) {
+                    console.error("更新 IP 備忘失敗:", err);
+                    alert("❌ 儲存至雲端失敗：" + err.message);
+                }
+            } else {
+                alert("請輸入有效的編號。");
             }
-            
-            message += `總計金額: NT$ ${grandTotal.toLocaleString()}`;
-            alert(message);
         });
     }
 
@@ -1769,7 +1906,7 @@ function renderTable() {
             if (catSelect) catSelect.value = record.category;
             
             // 載入付款管道
-            document.getElementById('manual-bank').value = record.bank || "現金";
+            document.getElementById('manual-bank').value = cleanBankName(record.bank || "現金");
             
             // 動態填入與渲染歸屬選單選項
             const usageSelect = document.getElementById('manual-usage');
@@ -2310,7 +2447,7 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
     const cat = document.getElementById('manual-cat').value;
     const usage = state.modalType === 'cashflow' ? '私用' : document.getElementById('manual-usage').value;
     const selectedMonth = document.getElementById('manual-month').value;
-    const bankVal = document.getElementById('manual-bank').value;
+    const bankVal = cleanBankName(document.getElementById('manual-bank').value);
     
     let amountTWD = NaN;
     if (amountStr) {
@@ -3001,7 +3138,7 @@ async function handleParsedBankRecords(records) {
             finalInsertPayload.push({
                 id: "m_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8),
                 month: state.currentMonth,
-                bank: r.bank,
+                bank: cleanBankName(r.bank),
                 date: r.date,
                 details: cleanDetails,
                 amount_twd: r.amountTWD,
