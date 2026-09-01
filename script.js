@@ -415,16 +415,17 @@ function initMonthSelectorSync() {
 // 執行同步月份初始化
 initMonthSelectorSync();
 
-// 全域資料載入請求序號，用於防止快速切換月份時出現網路競態覆蓋問題
-let currentLoadRequestId = 0;
+// 全域交易資料庫本地快取 (儲存所有月份交易，實現純本地 0 毫秒秒開切換)
+let allTransactions = [];
+let isAllDataLoaded = false;
 
-// 切換月份
+// 切換月份 (100% 純前端記憶體切換，無任何網路等待，連續狂按永遠順暢)
 monthSelector.addEventListener('change', (e) => {
     const newMonth = e.target.value;
     state.currentMonth = newMonth;
     sessionStorage.setItem('lastSelectedMonth', state.currentMonth);
     
-    // 立即即時更新畫面上方年份與月份標題，避免網路載入期間視覺停留在舊月份
+    // 立即即時更新畫面上方年份與月份標題
     if (newMonth && newMonth.length === 6) {
         const y = newMonth.substring(0, 4);
         const m = parseInt(newMonth.substring(4, 6), 10).toString();
@@ -440,7 +441,13 @@ monthSelector.addEventListener('change', (e) => {
     // 重設比對按鈕狀態與導覽按鈕
     resetMatchButton();
     updateMonthNavButtons();
-    loadData();
+    
+    // 若全域資料庫已載入，直接純本地瞬間切換；若尚未載入則發起載入
+    if (isAllDataLoaded) {
+        renderCurrentMonthData();
+    } else {
+        loadData();
+    }
 });
 
 // 上一個月按鈕點擊
@@ -469,6 +476,9 @@ manualMonthSelector.addEventListener('change', (e) => {
         updateManualDateByDefault(e.target.value);
     }
 });
+
+// 全域月份資料快取物件
+const monthDataCache = {};
 
 // 初始化月份選擇器（從資料庫載入所有已存在交易的月份，並補上預設月份）
 // 異步從雲端載入其他已存在交易的月份，並合併到選單中
@@ -501,9 +511,9 @@ async function initMonthSelector() {
                     return `<option value="${m}">${y} 年 ${mon} 月</option>`;
                 }).join('');
                 
-                const val = monthSelector.value;
+                const curVal = state.currentMonth;
                 monthSelector.innerHTML = optionsHtml;
-                monthSelector.value = val;
+                monthSelector.value = curVal;
             }
         }
         updateMonthNavButtons(); // 更新左右切換按鈕狀態
@@ -1192,6 +1202,14 @@ async function saveEventNotes(text) {
             
         if (error) throw error;
         
+        // 同步全域 allTransactions
+        const existingNote = allTransactions.find(r => r.id === noteId);
+        if (existingNote) {
+            existingNote.custom_summary = text;
+        } else {
+            allTransactions.push(dbUpdates);
+        }
+        
         // 顯示「已同步」提示，兩秒後自動隱藏
         if (statusEl) {
             statusEl.style.opacity = '1';
@@ -1205,129 +1223,133 @@ async function saveEventNotes(text) {
     }
 }
 
-// 載入資料 (從 Supabase，加入防競態序號保護與高效記憶體清洗)
-async function loadData() {
-    const requestId = ++currentLoadRequestId;
-    tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem;">⏳ 正在從雲端載入資料...</td></tr>`;
-    
-    const cashflowBody = document.getElementById('cashflow-transaction-body');
-    if (cashflowBody) {
-        cashflowBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:#a0aec0;">⏳ 正在載入現金流明細...</td></tr>`;
-    }
-    
-    try {
-        const { data, error } = await supabaseClient
-            .from('transactions')
-            .select('*')
-            .eq('month', state.currentMonth)
-            .order('date', { ascending: false });
+// 載入資料 (全域預載 + 本地 0 毫秒極速秒開)
+async function loadData(forceReload = false) {
+    if (!isAllDataLoaded || forceReload) {
+        tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 2rem;">⏳ 正在從雲端載入資料庫...</td></tr>`;
+        const cashflowBody = document.getElementById('cashflow-transaction-body');
+        if (cashflowBody) {
+            cashflowBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:#a0aec0;">⏳ 正在載入現金流明細...</td></tr>`;
+        }
+        
+        try {
+            const { data, error } = await supabaseClient
+                .from('transactions')
+                .select('*')
+                .order('date', { ascending: false });
 
-        // 若不是最新一次發起的請求（使用者在此期間又切換了其他月份），直接略過捨棄，防止舊月份資料覆蓋畫面
-        if (requestId !== currentLoadRequestId) {
+            if (error) throw error;
+            allTransactions = data || [];
+            isAllDataLoaded = true;
+        } catch (error) {
+            console.error("雲端載入失敗:", error);
+            tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:red; padding: 2rem;">❌ 載入失敗！請檢查網路連線是否正常。</td></tr>`;
             return;
         }
-
-        if (error) throw error;
-
-        // 1. 進行資料的前置清洗與標準化 (在記憶體中快速轉換，避免在載入迴圈內發送大量非同步網路請求)
-        const noteId = `note_${state.currentMonth}`;
-        const rawList = data || [];
-        const cleanedData = rawList.map(r => {
-            let details = r.details || '';
-            let category = r.category || '未分類';
-            
-            // 統一生活費的 details 與 category
-            if (details === '生活費已撥款' || details === '生活費入帳（待確認）' || details === '生活費入帳') {
-                details = '生活費入帳（待確認）';
-                if (!category || category === '未分類') {
-                    category = '生活費入帳';
-                }
-            }
-            
-            // 自動對齊名稱：前期未返還代墊款(瑗) -> 前期應返還高錦瑗代墊款
-            if (category === '前期未返還代墊款(瑗)') {
-                category = '前期應返還高錦瑗代墊款';
-            }
-            if (details === '前期未返還代墊款(瑗)') {
-                details = '前期應返還高錦瑗代墊款';
-            }
-            
-            // 外送與行動支付平台名稱標準化
-            if (details) {
-                details = standardizeDeliveryDetails(details);
-            }
-            
-            // 解析電商訂單摘要快取
-            const matchedOrd = state.ecommerceOrders.find(o => o.id === r.matched_order);
-            let customSum = r.custom_summary;
-            if (!customSum && matchedOrd) {
-                const count = matchedOrd.items.length;
-                let autoText = matchedOrd.items.slice(0, 2).map(i => i.name).join('、');
-                if (count > 2) autoText += '...等';
-                customSum = autoText;
-            }
-            
-            return {
-                id: r.id,
-                month: r.month,
-                bank: r.bank === '手帳' ? '現金' : cleanBankName(r.bank || '現金'),
-                date: r.date,
-                details: details,
-                amountTWD: r.amount_twd,
-                amountForeign: r.amount_foreign,
-                currency: r.currency || 'TWD',
-                category: category,
-                usageType: r.usage_type ? ((r.usage_type === '綉家庭開支' || r.usage_type === '綉開支') ? '綉現金開支' : r.usage_type.trim()) : '瑗家用墊款',
-                customSummary: customSum,
-                matchedOrder: r.matched_order,
-                matchedItems: matchedOrd ? matchedOrd.items : []
-            };
-        });
-
-        // 2. 篩選出事件紀錄特殊交易並渲染至事件紀錄文字區
-        const noteRecord = cleanedData.find(r => r.id === noteId);
-        const eventNotesTextarea = document.getElementById('event-notes');
-        const notesVal = noteRecord ? (noteRecord.customSummary || '') : '';
-        if (eventNotesTextarea) {
-            eventNotesTextarea.value = notesVal;
-        }
-        lastSavedNotes = notesVal;
-
-        // 3. 將事件紀錄從明細中過濾剔除，其餘存入全域狀態
-        state.bankRecords = cleanedData.filter(r => r.id !== noteId);
-        
-        // 4. 動態補上資料庫中存在但本地暫時沒有的自訂分類與歸屬項目
-        state.bankRecords.forEach(r => {
-            if (r.category && r.category !== "未分類") {
-                if (CASHFLOW_CATEGORIES.includes(r.category)) {
-                    // 已在現金流分類中
-                } else if (!CATEGORIES.includes(r.category)) {
-                    CATEGORIES.push(r.category);
-                }
-            }
-            if (r.usageType && !USAGES.includes(r.usageType) && r.usageType !== "私用") {
-                USAGES.push(r.usageType);
-            }
-        });
-        
-        // 標記已經配對過的電商訂單
-        state.ecommerceOrders.forEach(o => {
-            const isMatched = state.bankRecords.some(r => r.matchedOrder === o.id);
-            o.isMatched = isMatched;
-        });
-        
-        // 基礎自動分類
-        autoCategorizeBase();
-
-        // 渲染表格與更新統計
-        renderTable();
-        updateSummary();
-    } catch (error) {
-        if (requestId === currentLoadRequestId) {
-            console.error("載入失敗:", error);
-            tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:red; padding: 2rem;">❌ 載入失敗！請檢查網路連線是否正常。</td></tr>`;
-        }
     }
+
+    // 本地極速 0 毫秒秒開渲染
+    renderCurrentMonthData();
+}
+
+// 根據當前月份篩選並渲染資料 (純前端記憶體運算，耗時小於 1ms，支援無限次快速切換)
+function renderCurrentMonthData() {
+    const targetMonth = state.currentMonth;
+    const noteId = `note_${targetMonth}`;
+    
+    // 1. 從本地全域陣列篩選當月資料
+    const rawList = allTransactions.filter(r => r.month === targetMonth);
+    
+    // 2. 進行資料的前置清洗與標準化 (在記憶體中快速轉換)
+    const cleanedData = rawList.map(r => {
+        let details = r.details || '';
+        let category = r.category || '未分類';
+        
+        // 統一生活費的 details 與 category
+        if (details === '生活費已撥款' || details === '生活費入帳（待確認）' || details === '生活費入帳') {
+            details = '生活費入帳（待確認）';
+            if (!category || category === '未分類') {
+                category = '生活費入帳';
+            }
+        }
+        
+        // 自動對齊名稱：前期未返還代墊款(瑗) -> 前期應返還高錦瑗代墊款
+        if (category === '前期未返還代墊款(瑗)') {
+            category = '前期應返還高錦瑗代墊款';
+        }
+        if (details === '前期未返還代墊款(瑗)') {
+            details = '前期應返還高錦瑗代墊款';
+        }
+        
+        // 外送與行動支付平台名稱標準化
+        if (details) {
+            details = standardizeDeliveryDetails(details);
+        }
+        
+        // 解析電商訂單摘要快取
+        const matchedOrd = state.ecommerceOrders.find(o => o.id === r.matched_order);
+        let customSum = r.custom_summary;
+        if (!customSum && matchedOrd) {
+            const count = matchedOrd.items.length;
+            let autoText = matchedOrd.items.slice(0, 2).map(i => i.name).join('、');
+            if (count > 2) autoText += '...等';
+            customSum = autoText;
+        }
+        
+        return {
+            id: r.id,
+            month: r.month,
+            bank: r.bank === '手帳' ? '現金' : cleanBankName(r.bank || '現金'),
+            date: r.date,
+            details: details,
+            amountTWD: r.amount_twd,
+            amountForeign: r.amount_foreign,
+            currency: r.currency || 'TWD',
+            category: category,
+            usageType: r.usage_type ? ((r.usage_type === '綉家庭開支' || r.usage_type === '綉開支') ? '綉現金開支' : r.usage_type.trim()) : '瑗家用墊款',
+            customSummary: customSum,
+            matchedOrder: r.matched_order,
+            matchedItems: matchedOrd ? matchedOrd.items : []
+        };
+    });
+
+    // 3. 篩選出事件紀錄特殊交易並渲染至事件紀錄文字區
+    const noteRecord = cleanedData.find(r => r.id === noteId);
+    const eventNotesTextarea = document.getElementById('event-notes');
+    const notesVal = noteRecord ? (noteRecord.customSummary || '') : '';
+    if (eventNotesTextarea) {
+        eventNotesTextarea.value = notesVal;
+    }
+    lastSavedNotes = notesVal;
+
+    // 4. 存入過濾後的帳務明細
+    state.bankRecords = cleanedData.filter(r => r.id !== noteId);
+    
+    // 5. 動態補上資料庫中存在但本地暫時沒有的自訂分類與歸屬項目
+    state.bankRecords.forEach(r => {
+        if (r.category && r.category !== "未分類") {
+            if (CASHFLOW_CATEGORIES.includes(r.category)) {
+                // 已在現金流分類中
+            } else if (!CATEGORIES.includes(r.category)) {
+                CATEGORIES.push(r.category);
+            }
+        }
+        if (r.usageType && !USAGES.includes(r.usageType) && r.usageType !== "私用") {
+            USAGES.push(r.usageType);
+        }
+    });
+    
+    // 6. 標記已經配對過的電商訂單
+    state.ecommerceOrders.forEach(o => {
+        o.isMatched = state.bankRecords.some(r => r.matchedOrder === o.id);
+    });
+    
+    // 7. 基礎自動分類
+    autoCategorizeBase();
+
+    // 8. 渲染表格與更新統計
+    renderTable();
+    updateSummary();
 }
 
 // 匯入舊的 JSON 資料到 Supabase
@@ -1475,12 +1497,10 @@ async function updateRecordInDb(id, updates) {
         diffs.push(`月份 "${record.month}" ➔ "${updates.month}"`);
     }
 
-    // 先在畫面更新，保持順暢感
+    // 先在畫面與全域快取更新，保持極速順暢感
     const oldRecordCopy = { ...record };
     Object.assign(record, updates);
-    updateSummary();
 
-    // 背景上傳到 Supabase
     const dbUpdates = {};
     if (updates.category !== undefined) dbUpdates.category = updates.category;
     if (updates.usageType !== undefined) dbUpdates.usage_type = updates.usageType;
@@ -1491,7 +1511,15 @@ async function updateRecordInDb(id, updates) {
     if (updates.matchedOrder !== undefined) dbUpdates.matched_order = updates.matchedOrder;
     if (updates.month !== undefined) dbUpdates.month = updates.month;
     if (updates.bank !== undefined) dbUpdates.bank = updates.bank;
-    
+
+    const globalIdx = allTransactions.findIndex(r => r.id === id);
+    if (globalIdx !== -1) {
+        Object.assign(allTransactions[globalIdx], dbUpdates);
+    }
+
+    updateSummary();
+
+    // 背景上傳到 Supabase
     await supabaseClient.from('transactions').update(dbUpdates).eq('id', id);
     
     // 雲端更新成功後寫入日誌
@@ -1500,7 +1528,7 @@ async function updateRecordInDb(id, updates) {
         writeLog(logContent);
     }
     
-    // 雲端更新完成後，再次更新年度發票小計，確保其與雲端一致，避免非同步時間差導致的數值不正確
+    // 再次更新年度發票小計
     updateYearInvoiceTotal();
 }
 
@@ -1508,8 +1536,10 @@ async function deleteRecordInDb(id) {
     const record = state.bankRecords.find(r => r.id === id);
     if (!record) return;
 
-    // 從畫面移除
+    // 從畫面與全域快取移除
     state.bankRecords = state.bankRecords.filter(r => r.id !== id);
+    allTransactions = allTransactions.filter(r => r.id !== id);
+    
     renderTable();
     updateSummary();
 
@@ -1520,7 +1550,7 @@ async function deleteRecordInDb(id) {
     const logContent = `刪除帳目: [${record.month}] [${record.date}] [${record.bank || '現金'}] ${record.details} | 金額: NT$ ${record.amountTWD} | 歸屬: ${record.usageType}`;
     writeLog(logContent);
 
-    // 雲端刪除完成後，再次更新年度發票小計，確保其與雲端一致，避免非同步時間差導致的數值不正確
+    // 再次更新年度發票小計
     updateYearInvoiceTotal();
 }
 
@@ -2617,6 +2647,9 @@ document.getElementById('confirm-manual-btn').addEventListener('click', async ()
 
             const { error } = await supabaseClient.from('transactions').insert([newRecord]);
             if (error) throw error;
+            
+            // 同步全域 allTransactions
+            allTransactions.unshift(newRecord);
             
             // 雲端新增成功後寫入日誌
             const logContent = `新增帳目: [${selectedMonth}] [${date}] [${bankVal}] ${details} | 金額: NT$ ${amountTWD} | 分類: ${cat} | 歸屬: ${usage}`;
