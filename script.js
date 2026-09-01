@@ -8,9 +8,11 @@ let CATEGORIES = [
     "未分類", "母親照顧", "醫療", "食", "交通", "家用"
 ];
 
-// 家庭現金流分類
+// 家庭現金流分類 (包含生活費入帳、各項代墊償付與前期應返還代墊款等)
 let CASHFLOW_CATEGORIES = [
-    "生活費入帳", "代墊償付(瑗)", "代墊償付(綉)", "代墊償付(外看)"
+    "生活費入帳", 
+    "代墊償付(瑗)", "代墊償付(綉)", "代墊償付(外看)",
+    "前期應返還高錦瑗代墊款", "前期未返還代墊款(綉)", "前期未返還代墊款(外看)", "前期未返還代墊款"
 ];
 
 // 載入自訂分類
@@ -43,7 +45,7 @@ if (savedUsages) {
 }
 
 // 常用消費明細與快速標籤（拿掉 UE, PF）
-let QUICK_TAGS = ["水費", "電費", "電話費", "櫟安司機揹錢", "櫟安交通費", "房屋稅", "地價稅", "國有財產局地租", "外看薪水", "外看餐費", "勞保費", "健保費", "餐食", "藥品", "生活用品", "生活費入帳"];
+let QUICK_TAGS = ["水費", "電費", "電話費", "櫟安司機揹錢", "櫟安交通費", "房屋稅", "地價稅", "國有財產局地租", "外看薪水", "外看餐費", "勞保費", "健保費", "餐食", "藥品", "生活用品", "生活費入帳", "前期應返還高錦瑗代墊款", "前期未返還代墊款"];
 const savedTags = localStorage.getItem("customQuickTags");
 if (savedTags) {
     try {
@@ -371,39 +373,13 @@ const reportYearLabel = document.getElementById('report-year-label');
 
 // 同步設定月份選單與標籤，防止畫面載入時出現 5 月的閃爍現象
 function initMonthSelectorSync() {
-    const today = new Date();
-    const thisYear = today.getFullYear();
-    const thisMonth = today.getMonth(); // 0-11
-    const thisDay = today.getDate();
-    
     const monthsSet = new Set();
     
-    // 預設月份
-    monthsSet.add("202604");
-    monthsSet.add("202605");
-    monthsSet.add("202606");
-    
-    // 補上 2025/01 - 2026/03 的回溯月份
-    for (let m = 1; m <= 12; m++) {
-        monthsSet.add(`2025${String(m).padStart(2, '0')}`);
-    }
-    for (let m = 1; m <= 3; m++) {
-        monthsSet.add(`2026${String(m).padStart(2, '0')}`);
-    }
-    
-    const thisMonthStr = `${thisYear}${String(thisMonth + 1).padStart(2, '0')}`;
-    monthsSet.add(thisMonthStr);
-    
-    // 每月 15 號（含）之後，自動新增下個月的選項
-    if (thisDay >= 15) {
-        let nextMonth = thisMonth + 1;
-        let nextYear = thisYear;
-        if (nextMonth > 11) {
-            nextMonth = 0;
-            nextYear += 1;
+    // 預設加入 2025 年與 2026 年完整的 12 個月份 (最多到 2026 年底)
+    for (let y = 2025; y <= 2026; y++) {
+        for (let m = 1; m <= 12; m++) {
+            monthsSet.add(`${y}${String(m).padStart(2, '0')}`);
         }
-        const nextMonthStr = `${nextYear}${String(nextMonth + 1).padStart(2, '0')}`;
-        monthsSet.add(nextMonthStr);
     }
     
     const sortedMonths = Array.from(monthsSet).sort();
@@ -432,21 +408,39 @@ function initMonthSelectorSync() {
     const monthLabel = document.getElementById('month-label');
     if (yearLabel) yearLabel.textContent = initY;
     if (monthLabel) monthLabel.textContent = initM;
+    
+    updateMonthNavButtons();
 }
 
 // 執行同步月份初始化
 initMonthSelectorSync();
 
+// 全域資料載入請求序號，用於防止快速切換月份時出現網路競態覆蓋問題
+let currentLoadRequestId = 0;
+
 // 切換月份
 monthSelector.addEventListener('change', (e) => {
-    state.currentMonth = e.target.value;
+    const newMonth = e.target.value;
+    state.currentMonth = newMonth;
     sessionStorage.setItem('lastSelectedMonth', state.currentMonth);
+    
+    // 立即即時更新畫面上方年份與月份標題，避免網路載入期間視覺停留在舊月份
+    if (newMonth && newMonth.length === 6) {
+        const y = newMonth.substring(0, 4);
+        const m = parseInt(newMonth.substring(4, 6), 10).toString();
+        const yearLabel = document.getElementById('year-label');
+        const monthLabel = document.getElementById('month-label');
+        if (yearLabel) yearLabel.textContent = y;
+        if (monthLabel) monthLabel.textContent = m;
+    }
+    
     const savedOrders = localStorage.getItem('ecommerceOrders_' + state.currentMonth);
     state.ecommerceOrders = savedOrders ? JSON.parse(savedOrders) : [];
-    // 重設比對按鈕狀態
+    
+    // 重設比對按鈕狀態與導覽按鈕
     resetMatchButton();
+    updateMonthNavButtons();
     loadData();
-    updateMonthNavButtons(); // 更新左右切換按鈕狀態
 });
 
 // 上一個月按鈕點擊
@@ -1211,9 +1205,15 @@ async function saveEventNotes(text) {
     }
 }
 
-// 載入資料 (從 Supabase)
+// 載入資料 (從 Supabase，加入防競態序號保護與高效記憶體清洗)
 async function loadData() {
+    const requestId = ++currentLoadRequestId;
     tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem;">⏳ 正在從雲端載入資料...</td></tr>`;
+    
+    const cashflowBody = document.getElementById('cashflow-transaction-body');
+    if (cashflowBody) {
+        cashflowBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:#a0aec0;">⏳ 正在載入現金流明細...</td></tr>`;
+    }
     
     try {
         const { data, error } = await supabaseClient
@@ -1222,39 +1222,39 @@ async function loadData() {
             .eq('month', state.currentMonth)
             .order('date', { ascending: false });
 
+        // 若不是最新一次發起的請求（使用者在此期間又切換了其他月份），直接略過捨棄，防止舊月份資料覆蓋畫面
+        if (requestId !== currentLoadRequestId) {
+            return;
+        }
+
         if (error) throw error;
 
-        // 1. 進行雲端資料的前置清洗與轉換 (合併生活費的 details 與 category)
+        // 1. 進行資料的前置清洗與標準化 (在記憶體中快速轉換，避免在載入迴圈內發送大量非同步網路請求)
         const noteId = `note_${state.currentMonth}`;
-        const cleanedData = data.map(r => {
-            let details = r.details;
-            let category = r.category;
-            let hasChanged = false;
+        const rawList = data || [];
+        const cleanedData = rawList.map(r => {
+            let details = r.details || '';
+            let category = r.category || '未分類';
             
-            // 只要明細包含生活費撥款字眼，統一清洗為「生活費入帳（待確認）」且分類為「生活費入帳」
+            // 統一生活費的 details 與 category
             if (details === '生活費已撥款' || details === '生活費入帳（待確認）' || details === '生活費入帳') {
-                if (details !== '生活費入帳（待確認）') {
-                    details = '生活費入帳（待確認）';
-                    hasChanged = true;
-                }
-                if (category !== '生活費入帳') {
+                details = '生活費入帳（待確認）';
+                if (!category || category === '未分類') {
                     category = '生活費入帳';
-                    hasChanged = true;
                 }
             }
             
-            // 雲端舊資料清洗對應為 ubereats 與 熊貓 (格式：ubereats-餐廳名 或 熊貓-餐廳名)
+            // 自動對齊名稱：前期未返還代墊款(瑗) -> 前期應返還高錦瑗代墊款
+            if (category === '前期未返還代墊款(瑗)') {
+                category = '前期應返還高錦瑗代墊款';
+            }
+            if (details === '前期未返還代墊款(瑗)') {
+                details = '前期應返還高錦瑗代墊款';
+            }
+            
+            // 外送與行動支付平台名稱標準化
             if (details) {
-                let cleanD = standardizeDeliveryDetails(details);
-                if (cleanD !== details) {
-                    details = cleanD;
-                    hasChanged = true;
-                }
-            }
-            
-            if (hasChanged) {
-                // 背景非同步更新 Supabase 雲端資料庫
-                updateRecordInDb(r.id, { details: details, category: category });
+                details = standardizeDeliveryDetails(details);
             }
             
             // 解析電商訂單摘要快取
@@ -1265,18 +1265,17 @@ async function loadData() {
                 let autoText = matchedOrd.items.slice(0, 2).map(i => i.name).join('、');
                 if (count > 2) autoText += '...等';
                 customSum = autoText;
-                updateRecordInDb(r.id, { customSummary: autoText });
             }
             
             return {
                 id: r.id,
                 month: r.month,
-                bank: r.bank === '手帳' ? '現金' : r.bank,
+                bank: r.bank === '手帳' ? '現金' : cleanBankName(r.bank || '現金'),
                 date: r.date,
                 details: details,
                 amountTWD: r.amount_twd,
                 amountForeign: r.amount_foreign,
-                currency: r.currency,
+                currency: r.currency || 'TWD',
                 category: category,
                 usageType: r.usage_type ? ((r.usage_type === '綉家庭開支' || r.usage_type === '綉開支') ? '綉現金開支' : r.usage_type.trim()) : '瑗家用墊款',
                 customSummary: customSum,
@@ -1292,16 +1291,16 @@ async function loadData() {
         if (eventNotesTextarea) {
             eventNotesTextarea.value = notesVal;
         }
-        lastSavedNotes = notesVal; // 同步最後儲存值，防重複上傳
+        lastSavedNotes = notesVal;
 
         // 3. 將事件紀錄從明細中過濾剔除，其餘存入全域狀態
         state.bankRecords = cleanedData.filter(r => r.id !== noteId);
         
-        // 4. 動態補上資料庫中存在但本地暫時沒有的自訂分類與歸屬項目，以防左側小計統計遺漏
+        // 4. 動態補上資料庫中存在但本地暫時沒有的自訂分類與歸屬項目
         state.bankRecords.forEach(r => {
             if (r.category && r.category !== "未分類") {
                 if (CASHFLOW_CATEGORIES.includes(r.category)) {
-                    // 已在現金流分類中，不重複處理
+                    // 已在現金流分類中
                 } else if (!CATEGORIES.includes(r.category)) {
                     CATEGORIES.push(r.category);
                 }
@@ -1311,20 +1310,23 @@ async function loadData() {
             }
         });
         
-        // 標記已經配對過的電商訂單為已配對，避免重複被配對
+        // 標記已經配對過的電商訂單
         state.ecommerceOrders.forEach(o => {
             const isMatched = state.bankRecords.some(r => r.matchedOrder === o.id);
             o.isMatched = isMatched;
         });
         
-        // 自動分類 (如果還沒分類)
+        // 基礎自動分類
         autoCategorizeBase();
 
+        // 渲染表格與更新統計
         renderTable();
         updateSummary();
     } catch (error) {
-        console.error("載入失敗:", error);
-        tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:red; padding: 2rem;">❌ 載入失敗或資料庫未建立！請確認是否已經在 Supabase 建立 transactions 資料表。</td></tr>`;
+        if (requestId === currentLoadRequestId) {
+            console.error("載入失敗:", error);
+            tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:red; padding: 2rem;">❌ 載入失敗！請檢查網路連線是否正常。</td></tr>`;
+        }
     }
 }
 
@@ -1538,7 +1540,12 @@ function renderTable() {
         if (monthLabel) monthLabel.textContent = month;
     }
     
-    let filteredRecords = state.bankRecords.filter(record => {
+    // 1. 現金流交易：凡是分類屬於 CASHFLOW_CATEGORIES 的項目，一律獨立納入家庭現金流明細
+    const cashflowRecords = state.bankRecords.filter(r => CASHFLOW_CATEGORIES.includes(r.category));
+    
+    // 2. 實際開支交易：先排除現金流項目，再依據當前頁籤進行過濾
+    const nonCashflowRecords = state.bankRecords.filter(r => !CASHFLOW_CATEGORIES.includes(r.category));
+    const expenseRecords = nonCashflowRecords.filter(record => {
         // 基本過濾 (按頁籤)
         let matchTab = false;
         if (state.currentTab === 'all') {
@@ -1555,10 +1562,6 @@ function renderTable() {
         }
         return matchTab;
     });
-    
-    // 拆分現金流交易與實際開支交易
-    const cashflowRecords = filteredRecords.filter(r => CASHFLOW_CATEGORIES.includes(r.category));
-    const expenseRecords = filteredRecords.filter(r => !CASHFLOW_CATEGORIES.includes(r.category));
     
     // 1. 現金流交易排序 (依日期)
     cashflowRecords.sort((a, b) => {
@@ -1869,16 +1872,17 @@ function renderTable() {
             const catSelect = document.getElementById('manual-cat');
             
             if (isCashflow) {
-                // 隱藏歸屬與快速標籤
+                // 隱藏歸屬，但顯示現金流快速標籤
                 if (usageGroup) usageGroup.style.display = 'none';
-                if (tagsGroup) tagsGroup.style.display = 'none';
+                if (tagsGroup) tagsGroup.style.display = 'block';
                 
                 // 載入現金流分類選單
                 if (catSelect) {
                     catSelect.innerHTML = CASHFLOW_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
                 }
+                renderQuickTags();
             } else {
-                // 顯示歸屬與快速標籤
+                // 顯示歸屬與開支快速標籤
                 if (usageGroup) usageGroup.style.display = 'block';
                 if (tagsGroup) tagsGroup.style.display = 'block';
                 
@@ -2124,38 +2128,80 @@ function updateSummary() {
     const cGT = document.getElementById('combined-grand-total');
     if (cGT) cGT.textContent = `NT$ ${totalHouseholdGrand + totalFamilyGrand}`;
 
-    // 更新家庭現金流統計列
+    // 更新家庭現金流統計列 (區分：生活費流入、實質代墊償付流出，以及待返還欠款聲明)
     const cashflowSummaryBar = document.getElementById('cashflow-summary-bar');
     if (cashflowSummaryBar) {
         let barHtml = '<span style="margin-right: 0.5rem; color: #2b6cb0; font-weight: bold;">📊 當月現金流統計：</span>';
         let items = [];
-        let cashflowTotal = 0;
+        
+        let totalInflow = 0;      // 生活費等實質流入
+        let totalOutflow = 0;     // 當月代墊償付等實質流出
+        let totalPendingDebt = 0; // 前期未返還/應返還代墊款 (作為註記聲明，不計入當月實質結餘相減)
         
         CASHFLOW_CATEGORIES.forEach(cat => {
-            const amt = cashflowSummary[cat] || 0;
-            if (amt !== 0) {
-                cashflowTotal += amt;
-                items.push(`<span style="background: white; border: 1px solid #bee3f8; padding: 2px 8px; border-radius: 4px; display: inline-block;">${cat}: <strong style="${amt < 0 ? 'color: #e53e3e;' : 'color: #2b6cb0;'}">NT$ ${amt.toLocaleString()}</strong></span>`);
+            const rawAmt = cashflowSummary[cat] || 0;
+            if (rawAmt !== 0) {
+                const absAmt = Math.abs(rawAmt);
+                
+                // 判斷分類性質
+                const isPendingDebt = /前期|未返還|應返還|欠款/i.test(cat);
+                const isInflow = /入帳|生活費|收入|撥款/i.test(cat);
+                
+                if (isPendingDebt) {
+                    // 待返還代墊款／掛帳聲明：以獨立提示標籤呈現，不扣除當月實質現金可用餘額
+                    totalPendingDebt += absAmt;
+                    items.push(`<span style="background: #fffaf0; border: 1px solid #feebc8; color: #c05621; padding: 2px 8px; border-radius: 4px; display: inline-block;">📌 ${cat}: <strong>NT$ ${absAmt.toLocaleString()}</strong> <small style="color:#a0aec0;">(掛帳聲明)</small></span>`);
+                } else if (isInflow) {
+                    // 實質資金流入
+                    totalInflow += absAmt;
+                    items.push(`<span style="background: white; border: 1px solid #c6f6d5; color: #22543d; padding: 2px 8px; border-radius: 4px; display: inline-block;">💵 ${cat}: <strong style="color: #276749;">NT$ ${absAmt.toLocaleString()}</strong></span>`);
+                } else {
+                    // 實質代墊償付流出
+                    totalOutflow += absAmt;
+                    items.push(`<span style="background: white; border: 1px solid #bee3f8; color: #2b6cb0; padding: 2px 8px; border-radius: 4px; display: inline-block;">💸 ${cat}: <strong style="color: #2b6cb0;">NT$ ${absAmt.toLocaleString()}</strong></span>`);
+                }
             }
         });
         
         if (items.length === 0) {
             barHtml += '<span style="color: #a0aec0; font-weight: normal;">本月尚無現金流數據</span>';
         } else {
-            // 加入淨流動合計小計。入帳為負（流入），支出為正。
-            const netLabel = cashflowTotal < 0 ? '剩餘可運用資金' : (cashflowTotal > 0 ? '淨資金流出' : '現金流相抵');
-            const totalHtml = `<span style="background: #2b6cb0; color: white; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-left: auto;">${netLabel}：<strong>NT$ ${Math.abs(cashflowTotal).toLocaleString()}</strong></span>`;
-            barHtml += items.join(' ') + totalHtml;
+            // 實質可用資金結餘 = 生活費流入 - 當月實質償付流出 (待返還欠款作為註記聲明，不混入當月實質結餘)
+            const netAmount = totalInflow - totalOutflow;
+            let netLabel = '';
+            let netBadgeColor = '#2b6cb0';
+            
+            if (totalInflow > 0 || totalOutflow > 0) {
+                if (netAmount > 0) {
+                    netLabel = '現金流大帳餘額';
+                    netBadgeColor = '#2b6cb0'; // 藍色
+                } else if (netAmount < 0) {
+                    netLabel = '淨資金流出';
+                    netBadgeColor = '#c53030'; // 紅色
+                } else {
+                    netLabel = '現金流相抵';
+                    netBadgeColor = '#4a5568';
+                }
+                const totalHtml = `<span style="background: ${netBadgeColor}; color: white; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-left: auto;">${netLabel}：<strong>NT$ ${Math.abs(netAmount).toLocaleString()}</strong></span>`;
+                barHtml += items.join(' ') + totalHtml;
+            } else {
+                // 若當月僅有掛帳聲明項目
+                barHtml += items.join(' ');
+            }
         }
         cashflowSummaryBar.innerHTML = barHtml;
     }
 
-    // 更新年度發票合計
+    // 更新年度發票合計 (使用快取，同一年內切換月份不重複請求雲端)
     updateYearInvoiceTotal();
 }
 
-// 非同步計算當前年度的宗親會發票合計，並更新 DOM
-async function updateYearInvoiceTotal() {
+// 年度發票快取變數
+let cachedInvoiceYear = null;
+let cachedInvoiceYearTotal = null;
+
+// 非同步計算當前年度的宗親會發票合計，並更新 DOM (支援年度快取，避免切換月份時重複查詢雲端)
+async function updateYearInvoiceTotal(forceRefresh = false) {
     if (!state.currentMonth || state.currentMonth.length !== 6) return;
     const year = state.currentMonth.substring(0, 4);
     
@@ -2166,6 +2212,12 @@ async function updateYearInvoiceTotal() {
     
     const yearTotalEl = document.getElementById('household-invoice-year-total');
     if (!yearTotalEl) return;
+    
+    // 若同年度已有快取且未要求強制刷新，直接使用快取值，不再連線 Supabase
+    if (!forceRefresh && cachedInvoiceYear === year && cachedInvoiceYearTotal !== null) {
+        yearTotalEl.textContent = `NT$ ${cachedInvoiceYearTotal.toLocaleString()}`;
+        return;
+    }
     
     try {
         const { data, error } = await supabaseClient
@@ -2185,6 +2237,8 @@ async function updateYearInvoiceTotal() {
             });
         }
         
+        cachedInvoiceYear = year;
+        cachedInvoiceYearTotal = yearInvoiceTotal;
         yearTotalEl.textContent = `NT$ ${yearInvoiceTotal.toLocaleString()}`;
     } catch (err) {
         console.error("計算年度辦公費合計失敗", err);
@@ -2192,11 +2246,39 @@ async function updateYearInvoiceTotal() {
     }
 }
 
-// 快速標籤渲染函數
-
+// 快速標籤渲染函數 (依據記帳模式切換顯示家庭開支常用標籤或現金流常用標籤)
 function renderQuickTags() {
     const container = document.getElementById('quick-tags');
+    if (!container) return;
     container.innerHTML = '';
+    
+    // 1. 若為家庭現金流模式：提供生活費入帳、代墊償付、前期應返還高錦瑗代墊款等專屬標籤
+    if (state.modalType === 'cashflow') {
+        const cashflowTags = [
+            "生活費入帳", 
+            "代墊償付(瑗)", "代墊償付(綉)", "代墊償付(外看)",
+            "前期應返還高錦瑗代墊款", "前期未返還代墊款(綉)", "前期未返還代墊款(外看)", "前期未返還代墊款"
+        ];
+        
+        cashflowTags.forEach(tag => {
+            const btn = document.createElement('button');
+            btn.className = 'quick-tag';
+            btn.style.background = '#ebf8ff';
+            btn.style.borderColor = '#bee3f8';
+            btn.style.color = '#2b6cb0';
+            btn.textContent = tag;
+            btn.onclick = () => { 
+                const detailsInput = document.getElementById('manual-details');
+                const catSelect = document.getElementById('manual-cat');
+                if (detailsInput) detailsInput.value = tag;
+                if (catSelect && CASHFLOW_CATEGORIES.includes(tag)) catSelect.value = tag;
+            };
+            container.appendChild(btn);
+        });
+        return;
+    }
+    
+    // 2. 家庭開支模式的快速標籤
     QUICK_TAGS.forEach(tag => {
         const btn = document.createElement('button');
         btn.className = 'quick-tag';
@@ -2315,18 +2397,17 @@ async function handleManageQuickTags() {
 // 手動新增視窗
 const manualModal = document.getElementById('manual-modal');
 // 點擊新增現金流
-// 點擊新增現金流
 if (addCashflowBtn) {
     addCashflowBtn.addEventListener('click', () => {
         state.editingId = null;
         state.modalType = 'cashflow';
         document.querySelector('#manual-modal h3').textContent = '💵 新增現金流記錄';
         
-        // 隱藏開支專用欄位與快速標籤
+        // 隱藏開支專用欄位，顯示現金流專屬快速標籤
         const usageGroup = document.getElementById('manual-usage-group');
         const tagsGroup = document.getElementById('manual-tags-group');
         if (usageGroup) usageGroup.style.display = 'none';
-        if (tagsGroup) tagsGroup.style.display = 'none';
+        if (tagsGroup) tagsGroup.style.display = 'block';
         
         // 分類選單只載入現金流分類
         const catSelect = document.getElementById('manual-cat');
@@ -2347,6 +2428,7 @@ if (addCashflowBtn) {
         document.getElementById('manual-bank').value = "現金";
         
         updateManualDateByDefault(state.currentMonth);
+        renderQuickTags();
         
         // 嘗試還原 10 分鐘內未完成之新增草稿
         const restored = checkAndRestoreDraft('cashflow', null);
@@ -2418,6 +2500,22 @@ if (manualModal) {
     manualModal.addEventListener('click', (e) => {
         if (e.target === manualModal) {
             closeManualModalWithCache();
+        }
+    });
+}
+
+// 分類切換時，若為現金流模式自動連動預設明細
+const manualCatSelectEl = document.getElementById('manual-cat');
+if (manualCatSelectEl) {
+    manualCatSelectEl.addEventListener('change', (e) => {
+        if (state.modalType === 'cashflow') {
+            const detailsInput = document.getElementById('manual-details');
+            if (detailsInput) {
+                // 若明細為空或原本為現金流分類，則自動連動同步
+                if (!detailsInput.value || CASHFLOW_CATEGORIES.includes(detailsInput.value) || detailsInput.value === '生活費入帳（待確認）') {
+                    detailsInput.value = e.target.value;
+                }
+            }
         }
     });
 }

@@ -16,7 +16,6 @@
         <header class="header">
             <div>
                 <h1>家庭帳務系統 <span style="font-size:1rem; color:#48bb78;">🟢 雲端同步中</span></h1>
-                <div style="font-size: 0.75rem; color: #a0aec0; margin-top: 2px;">系統更新時間：2026-07-30 22:33</div>
                 <div class="print-hidden" style="font-size: 0.8rem; color: #dd6b20; background-color: #fffaf0; border: 1px solid #feebc8; padding: 0.4rem 0.8rem; border-radius: 6px; margin-top: 0.5rem; max-width: 500px; line-height: 1.4; font-weight: 500;">
                     ⚠️ 家庭開支記帳資料以 2026/5 起為紀錄範圍，2026/5 前資料未完整建置，請以 2026/5 起之紀錄作為參考。
                     <br>💡 註明：負值為溢收款，正值為實際支出。
@@ -148,14 +147,17 @@
                 </div>
 
                  <!-- 💵 家庭現金流明細區塊 -->
-                <div class="cashflow-section collapsed" style="margin-bottom: 2rem;">
+                <div class="cashflow-section" style="margin-bottom: 2rem;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-left: 4px solid #3182ce; padding-left: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                        <h3 style="margin: 0; color: #2b6cb0; font-size: 1.15rem; font-weight: bold;">💵 家庭現金流明細 <span style="font-size: 0.8rem; color: #718096; font-weight: normal; margin-left: 8px;">(生活費入帳、代墊償付款等，不計入家庭總支出)</span></h3>
+                        <div>
+                            <h3 style="margin: 0; color: #2b6cb0; font-size: 1.15rem; font-weight: bold;">💵 家庭現金流明細 <span style="font-size: 0.8rem; color: #718096; font-weight: normal; margin-left: 8px;">（生活費入帳、代墊償付、前期未返還款等）</span></h3>
+                            <div style="font-size: 0.78rem; color: #718096; margin-top: 3px; line-height: 1.4;">僅記錄影響家庭可運用資金之大額流入、返還及跨期調整；日常消費請見下方家庭開支明細。</div>
+                        </div>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <button id="add-cashflow-btn" class="primary-btn" style="padding: 0.3rem 0.8rem; font-size: 0.85rem; background: #3182ce; border-color: #2b6cb0; margin: 0;">
                                 ➕ 新增現金流
                             </button>
-                            <button id="toggle-cashflow-btn" class="collapse-trigger">展開 ▼</button>
+                            <button id="toggle-cashflow-btn" class="collapse-trigger">收合 ▲</button>
                         </div>
                     </div>
                     <div class="table-container" style="margin-bottom: 0.75rem; overflow-x: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
@@ -213,6 +215,11 @@
                 </div>
             </main>
         </div>
+        
+        <!-- 畫面最下方頁尾 -->
+        <footer style="text-align: center; padding: 1.5rem 0 0.5rem 0; color: #a0aec0; font-size: 0.75rem;">
+            系統更新時間：2026-09-01 19:36
+        </footer>
     </div>
 
     <!-- 衝突選擇彈窗 (Modal) -->
@@ -261,6 +268,7 @@
                     <option value="聯邦">聯邦</option>
                     <option value="中信">中信</option>
                     <option value="永豐">永豐</option>
+                    <option value="代墊欠款">代墊欠款</option>
                 </select>
             </div>
             
