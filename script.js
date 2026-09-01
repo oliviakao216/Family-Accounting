@@ -2178,9 +2178,9 @@ function updateSummary() {
                 const isInflow = /入帳|生活費|收入|撥款/i.test(cat);
                 
                 if (isPendingDebt) {
-                    // 待返還代墊款／掛帳聲明：以獨立提示標籤呈現，不扣除當月實質現金可用餘額
+                    // 待返還代墊款：以獨立提示標籤呈現，不扣除當月實質現金可用餘額
                     totalPendingDebt += absAmt;
-                    items.push(`<span style="background: #fffaf0; border: 1px solid #feebc8; color: #c05621; padding: 2px 8px; border-radius: 4px; display: inline-block;">📌 ${cat}: <strong>NT$ ${absAmt.toLocaleString()}</strong> <small style="color:#a0aec0;">(掛帳聲明)</small></span>`);
+                    items.push(`<span style="background: #fffaf0; border: 1px solid #feebc8; color: #c05621; padding: 2px 8px; border-radius: 4px; display: inline-block;">📌 ${cat}: <strong>NT$ ${absAmt.toLocaleString()}</strong></span>`);
                 } else if (isInflow) {
                     // 實質資金流入
                     totalInflow += absAmt;
